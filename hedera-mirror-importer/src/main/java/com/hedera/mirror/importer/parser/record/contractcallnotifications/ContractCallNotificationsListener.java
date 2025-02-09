@@ -52,7 +52,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     TransactionBody body = recordItem.getTransactionBody();
     TransactionRecord txRecord = recordItem.getTransactionRecord();
     log.trace("Storing transaction body: {}", () -> Utility.printProtoMessage(body));
-    long consensusTimestamp = DomainUtils.timeStampInNanos(txRecord.getConsensusTimestamp());
+    long consensusTimestamp = DomainUtils.timestampInNanosMax(txRecord.getConsensusTimestamp());
 
     String payerAccountId = recordItem.getPayerAccountId().toString();
     if (properties.getIgnorePayersSet().contains(payerAccountId)) {

@@ -9,8 +9,7 @@ public record WrappedTransactionModel(
         WrappedReceipt receipt,
         WrappedTransfers transfers,
         Optional<WrappedAllowances> allowances,
-        Optional<WrappedContractCallResult> contractCall,
-        Optional<WrappedEthereumTransaction> ethereumTransaction
+        Optional<WrappedContractCallResult> contractCall
 ) {
     public static WrappedTransactionModel fromRecordItem(RecordItem item) {
         return new WrappedTransactionModel(
@@ -18,9 +17,7 @@ public record WrappedTransactionModel(
                 WrappedReceipt.fromRecordItem(item),
                 WrappedTransfers.fromRecordItem(item),
                 WrappedAllowances.fromRecordItem(item),
-                WrappedContractCallResult.fromRecordItem(item),
-                // TODO - determine if we actually need EVM transaction data or if this was purely for arbitrage
-                Optional.empty()
+                WrappedContractCallResult.fromRecordItem(item)
         );
     }
 }
