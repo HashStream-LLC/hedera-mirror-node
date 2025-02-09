@@ -4,6 +4,7 @@ import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hedera.mirror.common.util.DomainUtils;
 import com.hedera.mirror.importer.exception.ImporterException;
 import com.hedera.mirror.importer.parser.record.RecordItemListener;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
 import com.hedera.mirror.importer.util.Utility;
 import com.hederahashgraph.api.proto.java.TransactionBody;
 import com.hederahashgraph.api.proto.java.TransactionRecord;
@@ -69,6 +70,9 @@ public class ContractCallNotificationsListener implements RecordItemListener {
         payerAccountId);
       return;
     }
+
+    // TODO - potentially defer this until after confirming rule is matched
+    WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
 
     log.debug("Processing transaction {}", consensusTimestamp);
     String[] contractIds = ContractIdExtractor.extractContractIds(recordItem);
