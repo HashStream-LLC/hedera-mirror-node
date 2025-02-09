@@ -12,8 +12,9 @@ import jakarta.inject.Named;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.core.annotation.Order;
-import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
+
+import java.util.stream.Stream;
 
 @Log4j2
 @Named
@@ -24,6 +25,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
 
   private final ContractCallNotificationsProperties properties;
   private final SqsClientProvider sqsClientProvider;
+  private final NotificationRequestConverter notificationRequestConverter;
 
   private boolean isContractCallRelated(TransactionBody body, TransactionRecord txRecord) {
     return body.hasContractCall()
@@ -68,15 +70,21 @@ public class ContractCallNotificationsListener implements RecordItemListener {
       return;
     }
 
-    String key = String.valueOf(txRecord.getTransactionID().getAccountID().getAccountNum());
+    log.debug("Processing transaction {}", consensusTimestamp);
+    String[] contractIds = ContractIdExtractor.extractContractIds(recordItem);
+    if (contractIds.length == 0) {
+      log.debug(
+              "No contract ids in contract call. Nothing to send. consensusTimestamp={}, payerAccountId={}",
+              consensusTimestamp,
+              payerAccountId);
+      return;
+    }
 
-    RecordItemOuterClass.RecordItem kafkaRecordItem = buildRecordItem(consensusTimestamp,
-        txRecord, body);
-    log.debug("Processing transaction {} - {}", key, consensusTimestamp);
-    SendMessageRequest.Builder sqsMessageBuilder = SendMessageRequest.builder();
-    sqsMessageBuilder.queueUrl(properties.getNotificationsQueueUrl());
-    sqsMessageBuilder.messageBody(kafkaRecordItem.toString());
-    sqsClientProvider.getSqsClient().sendMessage(sqsMessageBuilder.build());
-    log.debug("Processed transaction {} - {}", key, consensusTimestamp);
+    SendMessageBatchRequest sqsRequest = notificationRequestConverter.toContractCallSqsNotificationRequests(
+            properties.getNotificationsQueueUrl(),
+            Stream.of(contractIds)
+    );
+    sqsClientProvider.getSqsClient().sendMessageBatch(sqsRequest);
+    log.debug("Processed transaction {}", consensusTimestamp);
   }
 }
