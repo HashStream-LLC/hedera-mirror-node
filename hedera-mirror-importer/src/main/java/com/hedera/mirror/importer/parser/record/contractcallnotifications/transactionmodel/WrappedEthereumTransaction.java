@@ -1,5 +1,8 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
+import com.hedera.mirror.common.domain.transaction.RecordItem;
+import com.hederahashgraph.api.proto.java.TransactionBody;
+
 import java.math.BigInteger;
 import java.util.Optional;
 
@@ -13,4 +16,4 @@ public record WrappedEthereumTransaction(
         BigInteger value,
         int transactionType,
         String data
-) {}
+) { }

@@ -13,13 +13,13 @@ public record WrappedTransactionModel(
         Optional<WrappedEthereumTransaction> ethereumTransaction
 ) {
     public static WrappedTransactionModel fromRecordItem(RecordItem item) {
-        // TODO - finish the implementation for allowances, contract calls, and eth transactions
         return new WrappedTransactionModel(
                 WrappedTransactionMetadata.fromRecordItem(item),
                 WrappedReceipt.fromRecordItem(item),
                 WrappedTransfers.fromRecordItem(item),
                 WrappedAllowances.fromRecordItem(item),
                 WrappedContractCallResult.fromRecordItem(item),
+                // TODO - determine if we actually need EVM transaction data or if this was purely for arbitrage
                 Optional.empty()
         );
     }
