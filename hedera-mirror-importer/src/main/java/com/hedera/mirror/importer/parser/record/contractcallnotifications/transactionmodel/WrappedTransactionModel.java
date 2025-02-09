@@ -19,7 +19,7 @@ public record WrappedTransactionModel(
                 WrappedReceipt.fromRecordItem(item),
                 WrappedTransfers.fromRecordItem(item),
                 WrappedAllowances.fromRecordItem(item),
-                Optional.empty(),
+                WrappedContractCallResult.fromRecordItem(item),
                 Optional.empty()
         );
     }
