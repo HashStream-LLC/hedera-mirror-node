@@ -5,7 +5,6 @@ set -e
 endpointUrl=$DOCKER_INTERNAL_LOCALSTACK_ENDPOINT
 notificationQueue=$NOTIFICATION_QUEUE_NAME
 streamRulesTable=$STREAM_RULES_TABLE
-ruleTypePredicateGsi=$RULE_TYPE_PREDICATE_GSI
 unprocessedRulesGsi=$UNPROCESSED_RULES_GSI
 
 echo "Bootstrapping localstack environment using endpoint: $endpointUrl"
@@ -33,27 +32,11 @@ aws dynamodb create-table \
   --table-name "$streamRulesTable" \
   --attribute-definitions \
       AttributeName=ruleId,AttributeType=S \
-      AttributeName=ruleType,AttributeType=N \
-      AttributeName=predicateValue,AttributeType=S \
       AttributeName=unprocessedSince,AttributeType=S \
   --key-schema AttributeName=ruleId,KeyType=HASH \
   --provisioned-throughput 'ReadCapacityUnits=5,WriteCapacityUnits=5' \
   --global-secondary-indexes \
     "[
-      {
-        \"IndexName\": \"$ruleTypePredicateGsi\",
-        \"KeySchema\": [
-          {\"AttributeName\":\"ruleType\",\"KeyType\":\"HASH\"},
-          {\"AttributeName\":\"predicateValue\",\"KeyType\":\"RANGE\"}
-        ],
-        \"Projection\": {
-          \"ProjectionType\":\"ALL\"
-        },
-        \"ProvisionedThroughput\": {
-          \"ReadCapacityUnits\": 5,
-          \"WriteCapacityUnits\": 5
-        }
-      },
       {
         \"IndexName\": \"$unprocessedRulesGsi\",
         \"KeySchema\": [
@@ -62,7 +45,7 @@ aws dynamodb create-table \
         ],
         \"Projection\": {
           \"ProjectionType\":\"INCLUDE\",
-          \"NonKeyAttributes\":[\"predicateValue\", \"disabled\"]
+          \"NonKeyAttributes\":[\"ruleType\", \"predicateValue\", \"disabled\"]
         },
         \"ProvisionedThroughput\": {
           \"ReadCapacityUnits\": 5,
