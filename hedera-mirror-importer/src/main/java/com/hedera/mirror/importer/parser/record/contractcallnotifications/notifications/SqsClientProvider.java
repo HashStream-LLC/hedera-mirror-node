@@ -18,7 +18,7 @@ public class SqsClientProvider {
     private SqsClient buildSqsClient() {
         SqsClientBuilder sqsBuilder = SqsClient.builder();
 
-        String sqsEndpoint = properties.getAwsEndpoint();
+        String sqsEndpoint = properties.getSqsEndpoint();
         boolean overrideSqsEndpoint = sqsEndpoint != null && !sqsEndpoint.isBlank();
         if (overrideSqsEndpoint) {
             sqsBuilder.endpointOverride(URI.create(sqsEndpoint));

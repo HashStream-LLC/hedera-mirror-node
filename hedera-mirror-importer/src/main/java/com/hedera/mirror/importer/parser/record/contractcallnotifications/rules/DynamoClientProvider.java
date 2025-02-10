@@ -17,7 +17,7 @@ public class DynamoClientProvider {
     private DynamoDbClient buildDynamoClient() {
         DynamoDbClientBuilder dynamoClientBuilder = DynamoDbClient.builder();
 
-        String dynamoEndpoint = properties.getAwsEndpoint();
+        String dynamoEndpoint = properties.getDynamoEndpoint();
         boolean overrideDynamoEndpoint = dynamoEndpoint != null && !dynamoEndpoint.isBlank();
         if (overrideDynamoEndpoint) {
             dynamoClientBuilder.endpointOverride(URI.create(dynamoEndpoint));

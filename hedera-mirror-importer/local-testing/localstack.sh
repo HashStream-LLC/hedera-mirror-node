@@ -62,7 +62,7 @@ aws dynamodb create-table \
         ],
         \"Projection\": {
           \"ProjectionType\":\"INCLUDE\",
-          \"NonKeyAttributes\":[\"predicateValue\"]
+          \"NonKeyAttributes\":[\"predicateValue\", \"disabled\"]
         },
         \"ProvisionedThroughput\": {
           \"ReadCapacityUnits\": 5,

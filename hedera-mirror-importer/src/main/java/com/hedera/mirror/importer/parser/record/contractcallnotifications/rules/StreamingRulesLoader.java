@@ -33,11 +33,13 @@ public class StreamingRulesLoader {
     }
 
     private ScanRequest.Builder getBaseQueryBuilder() {
+        // TODO - eventually optimize to get at enabled, contract call rules more efficiently with an index
         Map<String, AttributeValue> expressionValues = new HashMap<>();
         expressionValues.put(":falseVal", AttributeValue.builder().bool(false).build());
+        expressionValues.put(":ruleType", AttributeValue.builder().n(String.valueOf(ContractCallRuleType)).build());
         return ScanRequest.builder()
                 .tableName(_properties.getStreamRulesTable())
-                .filterExpression("attribute_not_exists(disabled) OR disabled = :falseVal")
+                .filterExpression("(attribute_not_exists(disabled) OR disabled = :falseVal) and ruleType = :ruleType")
                 .expressionAttributeValues(expressionValues);
     }
 
