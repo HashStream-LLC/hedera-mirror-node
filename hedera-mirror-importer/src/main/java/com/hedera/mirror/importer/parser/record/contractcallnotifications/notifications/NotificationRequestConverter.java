@@ -1,4 +1,4 @@
-package com.hedera.mirror.importer.parser.record.contractcallnotifications;
+package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,16 +8,15 @@ import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
-import java.util.List;
 import java.util.stream.Stream;
 
 @Service
 public class NotificationRequestConverter {
     private final ObjectMapper messageBodySerializer = ObjectToStringSerializer.OBJECT_MAPPER;
 
-    private NotificationRequest toNotificationRequest(String contractId) {
+    private NotificationRequest toNotificationRequest(String ruleId) {
         // TODO - the actual logic
-        return new NotificationRequest("TODO - get the rule", contractId);
+        return new NotificationRequest(ruleId, "TODO - get event id");
     }
 
     private SendMessageRequest toSqsMessage(String notificationQueueUrl, NotificationRequest notificationRequest)
@@ -37,9 +36,10 @@ public class NotificationRequestConverter {
 
     public SendMessageBatchRequest toContractCallSqsNotificationRequests(
             String notificationQueueUrl,
-            Stream<String> contractIds
+            String eventId,
+            Stream<String> ruleIds
     ) {
-        Stream<NotificationRequest> notificationRequests = contractIds.map(this::toNotificationRequest);
+        Stream<NotificationRequest> notificationRequests = ruleIds.map(this::toNotificationRequest);
         Stream<SendMessageBatchRequestEntry> messageBatchEntries = notificationRequests
                 .map(notificationRequest -> {
                     try {

@@ -6,7 +6,7 @@ endpointUrl=$DOCKER_INTERNAL_LOCALSTACK_ENDPOINT
 notificationQueue=$NOTIFICATION_QUEUE_NAME
 streamRulesTable=$STREAM_RULES_TABLE
 ruleTypePredicateGsi=$RULE_TYPE_PREDICATE_GSI
-notIngestedSinceGsi=$NOT_INGESTED_SINCE_GSI
+unprocessedRulesGsi=$UNPROCESSED_RULES_GSI
 
 echo "Bootstrapping localstack environment using endpoint: $endpointUrl"
 
@@ -55,7 +55,7 @@ aws dynamodb create-table \
         }
       },
       {
-        \"IndexName\": \"$notIngestedSinceGsi\",
+        \"IndexName\": \"$unprocessedRulesGsi\",
         \"KeySchema\": [
           {\"AttributeName\":\"ruleId\",\"KeyType\":\"HASH\"},
           {\"AttributeName\":\"notIngestedSince\",\"KeyType\":\"RANGE\"}

@@ -11,8 +11,10 @@ import java.util.Set;
 @ConfigurationProperties("hedera.mirror.importer.parser.record.contractcallnotifications")
 public class ContractCallNotificationsProperties {
     private final boolean enabled;
+    private final String awsEndpoint;
     private final String notificationsQueueUrl;
-    private final String sqsEndpoint;
+    private final String streamRulesTable;
+    private final String newRulesGsi;
     private final String ignorePayers;
 
     @Getter(lazy = true)
@@ -21,12 +23,16 @@ public class ContractCallNotificationsProperties {
             ImmutableSet.copyOf(ignorePayers.split(","));
 
     public ContractCallNotificationsProperties(boolean enabled,
+                                               @DefaultValue("") String awsEndpoint,
                                                String notificationsQueueUrl,
-                                               @DefaultValue("") String sqsEndpoint,
+                                               String streamRulesTable,
+                                               String newRulesGsi,
                                                String ignorePayers) {
         this.enabled = enabled;
+        this.awsEndpoint = awsEndpoint;
         this.notificationsQueueUrl = notificationsQueueUrl;
-        this.sqsEndpoint = sqsEndpoint;
+        this.streamRulesTable = streamRulesTable;
+        this.newRulesGsi = newRulesGsi;
         this.ignorePayers = ignorePayers;
     }
 }

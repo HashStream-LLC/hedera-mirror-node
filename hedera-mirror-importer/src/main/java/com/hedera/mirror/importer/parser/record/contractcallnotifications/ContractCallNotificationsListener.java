@@ -4,6 +4,10 @@ import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hedera.mirror.common.util.DomainUtils;
 import com.hedera.mirror.importer.exception.ImporterException;
 import com.hedera.mirror.importer.parser.record.RecordItemListener;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.EventId;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.NotificationRequestConverter;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.SqsClientProvider;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.RulesFinder;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
 import com.hedera.mirror.importer.util.Utility;
 import com.hederahashgraph.api.proto.java.TransactionBody;
@@ -26,6 +30,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
 
   private final ContractCallNotificationsProperties properties;
   private final SqsClientProvider sqsClientProvider;
+  private final RulesFinder rulesFinder;
   private final NotificationRequestConverter notificationRequestConverter;
 
   private boolean isContractCallRelated(TransactionBody body, TransactionRecord txRecord) {
@@ -64,28 +69,30 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     }
 
     if(!isContractCallRelated(body, txRecord)) {
-       log.debug(
-        "Ignoring non contract call transaction. consensusTimestamp={}, payerAccountId={}",
-        consensusTimestamp,
-        payerAccountId);
+      log.debug("Ignoring non contract call transaction. consensusTimestamp={}", consensusTimestamp);
       return;
     }
-
-    // TODO - potentially defer this until after confirming rule is matched
-    WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
 
     log.debug("Processing transaction {}", consensusTimestamp);
     String[] contractIds = ContractIdExtractor.extractContractIds(recordItem);
     if (contractIds.length == 0) {
-      log.debug(
-              "No contract ids in contract call. Nothing to send. consensusTimestamp={}, payerAccountId={}",
-              consensusTimestamp,
-              payerAccountId);
+      log.debug("No contract ids in contract call. consensusTimestamp={}", consensusTimestamp);
       return;
     }
 
+    String[] ruleIds = rulesFinder.getMatchedRuleIds(contractIds);
+
+    if (ruleIds.length == 0) {
+      log.debug("No matched rules. consensusTimestamp={}", consensusTimestamp);
+    }
+
+    log.debug("Found {} matched rules", ruleIds.length);
+    WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
+    String eventId = EventId.toEventId(transactionModel.metadata());
+
     SendMessageBatchRequest sqsRequest = notificationRequestConverter.toContractCallSqsNotificationRequests(
             properties.getNotificationsQueueUrl(),
+            eventId,
             Stream.of(contractIds)
     );
     sqsClientProvider.getSqsClient().sendMessageBatch(sqsRequest);

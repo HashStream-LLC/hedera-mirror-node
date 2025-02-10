@@ -1,5 +1,6 @@
-package com.hedera.mirror.importer.parser.record.contractcallnotifications;
+package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.ContractCallNotificationsProperties;
 import lombok.Getter;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -17,7 +18,7 @@ public class SqsClientProvider {
     private SqsClient buildSqsClient() {
         SqsClientBuilder sqsBuilder = SqsClient.builder();
 
-        String sqsEndpoint = properties.getSqsEndpoint();
+        String sqsEndpoint = properties.getAwsEndpoint();
         boolean overrideSqsEndpoint = sqsEndpoint != null && !sqsEndpoint.isBlank();
         if (overrideSqsEndpoint) {
             sqsBuilder.endpointOverride(URI.create(sqsEndpoint));
