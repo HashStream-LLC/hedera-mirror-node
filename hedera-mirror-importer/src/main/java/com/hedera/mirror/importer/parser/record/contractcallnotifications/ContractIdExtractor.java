@@ -9,9 +9,6 @@ import java.util.stream.Stream;
 public class ContractIdExtractor {
     public static String[] extractContractIds(RecordItem recordItem) {
         TransactionBody transactionBody = recordItem.getTransactionBody();
-        if (!transactionBody.hasContractCall() && !transactionBody.hasEthereumTransaction()) {
-            return new String[0];
-        }
         ContractFunctionResult contractCallResult = recordItem.getTransactionRecord().getContractCallResult();
         String entrypointContract = contractCallResult.getContractID().toString();
         Stream<String> contractLogIds = contractCallResult.getLogInfoList().stream()
