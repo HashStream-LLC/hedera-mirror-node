@@ -5,14 +5,13 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
-import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
+import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Log4j2
 @Component
@@ -79,12 +78,31 @@ public class StreamingRulesLoader {
         return scanResponse.items().stream().map(DynamoStreamingRule::toStreamingRule).toList();
     }
 
+    private void updateProcessedRules(List<StreamingRule> newRules) {
+        List<BatchStatementRequest> statements = newRules.stream()
+                .map(rule -> BatchStatementRequest.builder()
+                        .statement(String.format("UPDATE %s REMOVE unprocessedSince WHERE ruleId = ?", _properties.getStreamRulesTable()))
+                        .parameters(AttributeValue.builder().s(rule.ruleId()).build())
+                        .build())
+                .toList();
+        BatchExecuteStatementRequest batchRequest = BatchExecuteStatementRequest.builder()
+                .statements(statements)
+                .build();
+        _dynamoClient.batchExecuteStatement(batchRequest);
+    }
+
     @Scheduled(fixedRate = 5000) // Run every 5 seconds
     public void refreshRules() {
         if (_initialLoadCompleted) {
             List<StreamingRule> newRules = loadNewRules();
-            _rulesStore.addRules(newRules);
-            log.info("Loaded new data. {} records", newRules.size());
+            if (!newRules.isEmpty()) {
+                _rulesStore.addRules(newRules);
+                log.info("Loaded new data. {} records", newRules.size());
+                updateProcessedRules(newRules);
+            }
+            else {
+                log.debug("No new rules since last update");
+            }
         }
         else {
             List<StreamingRule> rules = loadAllEnabledRules();

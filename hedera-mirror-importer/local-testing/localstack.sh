@@ -35,7 +35,7 @@ aws dynamodb create-table \
       AttributeName=ruleId,AttributeType=S \
       AttributeName=ruleType,AttributeType=N \
       AttributeName=predicateValue,AttributeType=S \
-      AttributeName=notIngestedSince,AttributeType=S \
+      AttributeName=unprocessedSince,AttributeType=S \
   --key-schema AttributeName=ruleId,KeyType=HASH \
   --provisioned-throughput 'ReadCapacityUnits=5,WriteCapacityUnits=5' \
   --global-secondary-indexes \
@@ -58,7 +58,7 @@ aws dynamodb create-table \
         \"IndexName\": \"$unprocessedRulesGsi\",
         \"KeySchema\": [
           {\"AttributeName\":\"ruleId\",\"KeyType\":\"HASH\"},
-          {\"AttributeName\":\"notIngestedSince\",\"KeyType\":\"RANGE\"}
+          {\"AttributeName\":\"unprocessedSince\",\"KeyType\":\"RANGE\"}
         ],
         \"Projection\": {
           \"ProjectionType\":\"INCLUDE\",
