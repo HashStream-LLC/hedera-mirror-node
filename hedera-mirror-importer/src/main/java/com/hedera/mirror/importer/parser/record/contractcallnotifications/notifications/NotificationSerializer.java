@@ -30,7 +30,7 @@ public class NotificationSerializer extends JsonSerializer<Object> {
         NotificationObjectMapper = new ObjectMapper()
                 .registerModule(module)
                 .registerModule(new Jdk8Module())
-                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+                .setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE);
     }
 
     public static void init() {
