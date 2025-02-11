@@ -59,7 +59,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     String[] ruleIds = rulesFinder.getMatchedRuleIds(contractIds);
 
     if (ruleIds.length == 0) {
-      log.debug("No matched rules. consensusTimestamp={}", consensusTimestamp);
+      log.debug("No matched rules. consensusTimestamp={}, contractIds={}", consensusTimestamp, contractIds);
       return;
     }
 
