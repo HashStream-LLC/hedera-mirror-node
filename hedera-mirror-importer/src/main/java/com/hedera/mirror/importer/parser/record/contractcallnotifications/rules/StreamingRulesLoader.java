@@ -81,16 +81,23 @@ public class StreamingRulesLoader {
     }
 
     private void updateProcessedRules(List<StreamingRule> newRules) {
-        List<BatchStatementRequest> statements = newRules.stream()
-                .map(rule -> BatchStatementRequest.builder()
-                        .statement(String.format("UPDATE %s REMOVE unprocessedSince WHERE ruleId = ?", _properties.getStreamRulesTable()))
-                        .parameters(AttributeValue.builder().s(rule.ruleId()).build())
-                        .build())
-                .toList();
-        BatchExecuteStatementRequest batchRequest = BatchExecuteStatementRequest.builder()
-                .statements(statements)
-                .build();
-        _dynamoClient.batchExecuteStatement(batchRequest);
+        // Just doing this in a loop as:
+        // 1. Bulk attribute removal wasn't working with my PartiQL statement
+        // 2. I don't expect this list to get very big as processing will constantly be happening,
+        // so just eat the cost of a looped single-item attribute removal
+        for (StreamingRule rule : newRules) {
+            Map<String, AttributeValue> key = new HashMap<>();
+            key.put("ruleId", AttributeValue.builder().s(rule.ruleId()).build());
+
+            log.info("Removing unprocessedSince from rule {}", rule.ruleId());
+            UpdateItemRequest updateRequest = UpdateItemRequest.builder()
+                    .tableName(_properties.getStreamRulesTable())
+                    .key(key)
+                    .updateExpression("REMOVE unprocessedSince")
+                    .build();
+
+            _dynamoClient.updateItem(updateRequest);
+        }
     }
 
     @Scheduled(fixedRate = 5000) // Run every 5 seconds
@@ -99,7 +106,7 @@ public class StreamingRulesLoader {
             List<StreamingRule> newRules = loadNewRules();
             if (!newRules.isEmpty()) {
                 _rulesStore.addRules(newRules);
-                log.info("Loaded new data. {} records", newRules.size());
+                log.info("Rules loaded (incremental load). {} records", newRules.size());
                 updateProcessedRules(newRules);
             }
             else {
@@ -109,7 +116,7 @@ public class StreamingRulesLoader {
         else {
             List<StreamingRule> rules = loadAllEnabledRules();
             _rulesStore.addRules(rules);
-            log.info("Loaded all data. {} records", rules.size());
+            log.info("Rules loaded (all rules). {} records", rules.size());
             _initialLoadCompleted = true;
         }
     }
