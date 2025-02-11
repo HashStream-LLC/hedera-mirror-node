@@ -71,4 +71,7 @@ dependencies {
     implementation(project(":protobuf"))
     implementation("org.apache.kafka:kafka-clients")
     implementation("org.springframework.kafka:spring-kafka")
+    implementation("software.amazon.awssdk:sqs")
+    implementation("software.amazon.awssdk:dynamodb")
+    implementation("software.amazon.awssdk:dynamodb-enhanced")
 }
