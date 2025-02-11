@@ -21,6 +21,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.stream.Stream;
 
 @Log4j2
@@ -77,7 +78,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
     String eventId = EventId.toEventId(transactionModel.metadata());
 
-    SendMessageBatchRequest sqsRequest = notificationRequestConverter.toContractCallSqsNotificationRequests(
+    List<SendMessageBatchRequest> sqsBatchRequests = notificationRequestConverter.toSqsRequests(
             properties.getNotificationsQueueUrl(),
             eventId,
             transactionModel,
@@ -88,7 +89,9 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             consensusTimestamp,
             properties.getNotificationsQueueUrl()
     );
-    sqsClientProvider.getSqsClient().sendMessageBatch(sqsRequest);
+    for (SendMessageBatchRequest sqsBatchRequest : sqsBatchRequests) {
+      sqsClientProvider.getSqsClient().sendMessageBatch(sqsBatchRequest);
+    }
 
     Instant consensusTimestampAsInstant = Instant.ofEpochSecond(
             rawConsensusTimestamp.getSeconds(),
