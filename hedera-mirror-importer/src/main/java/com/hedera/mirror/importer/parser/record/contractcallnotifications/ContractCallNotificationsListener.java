@@ -43,12 +43,13 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     log.trace("Storing transaction body: {}", () -> Utility.printProtoMessage(body));
     long consensusTimestamp = DomainUtils.timestampInNanosMax(txRecord.getConsensusTimestamp());
 
+    log.debug("Ingesting transaction. consensusTimestamp={}", consensusTimestamp);
+
     if(!isContractCallRelated(body)) {
       log.debug("Ignoring non contract call transaction. consensusTimestamp={}", consensusTimestamp);
       return;
     }
 
-    log.debug("Processing transaction {}", consensusTimestamp);
     String[] contractIds = ContractIdExtractor.extractContractIds(recordItem);
     if (contractIds.length == 0) {
       log.debug("No contract ids in contract call. consensusTimestamp={}", consensusTimestamp);
