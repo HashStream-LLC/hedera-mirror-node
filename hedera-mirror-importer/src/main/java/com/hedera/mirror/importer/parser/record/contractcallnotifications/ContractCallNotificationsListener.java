@@ -10,6 +10,7 @@ import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifi
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.RulesFinder;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
 import com.hedera.mirror.importer.util.Utility;
+import com.hederahashgraph.api.proto.java.Timestamp;
 import com.hederahashgraph.api.proto.java.TransactionBody;
 import com.hederahashgraph.api.proto.java.TransactionRecord;
 import jakarta.inject.Named;
@@ -18,6 +19,8 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.core.annotation.Order;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.stream.Stream;
 
 @Log4j2
@@ -41,7 +44,8 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     TransactionBody body = recordItem.getTransactionBody();
     TransactionRecord txRecord = recordItem.getTransactionRecord();
     log.trace("Storing transaction body: {}", () -> Utility.printProtoMessage(body));
-    long consensusTimestamp = DomainUtils.timestampInNanosMax(txRecord.getConsensusTimestamp());
+    Timestamp rawConsensusTimestamp = txRecord.getConsensusTimestamp();
+    long consensusTimestamp = DomainUtils.timestampInNanosMax(rawConsensusTimestamp);
 
     log.debug("Ingesting transaction. consensusTimestamp={}", consensusTimestamp);
 
@@ -76,9 +80,25 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     SendMessageBatchRequest sqsRequest = notificationRequestConverter.toContractCallSqsNotificationRequests(
             properties.getNotificationsQueueUrl(),
             eventId,
+            transactionModel,
             Stream.of(contractIds)
     );
+    log.debug(
+            "Sending notification to SQS queue. consensusTimestamp={}, queueUrl={}",
+            consensusTimestamp,
+            properties.getNotificationsQueueUrl()
+    );
     sqsClientProvider.getSqsClient().sendMessageBatch(sqsRequest);
-    log.debug("Processed transaction {}", consensusTimestamp);
+
+    Instant consensusTimestampAsInstant = Instant.ofEpochSecond(
+            rawConsensusTimestamp.getSeconds(),
+            rawConsensusTimestamp.getNanos()
+    );
+    Duration timeSinceConsensus = Duration.between(consensusTimestampAsInstant, Instant.now());
+    log.info(
+            "Processed contract call transaction {}. Time since consensus: {}",
+            consensusTimestamp,
+            timeSinceConsensus.toMillis()
+    );
   }
 }
