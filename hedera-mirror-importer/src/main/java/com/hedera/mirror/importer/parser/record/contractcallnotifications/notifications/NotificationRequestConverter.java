@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
 
+import java.util.UUID;
 import java.util.stream.Stream;
 
 @Service
@@ -13,6 +14,7 @@ public class NotificationRequestConverter {
     private SendMessageBatchRequestEntry toSqsBatchEntry(NotificationRequest notificationRequest)
             throws JsonProcessingException {
         SendMessageBatchRequestEntry.Builder batchEntryBuilder = SendMessageBatchRequestEntry.builder();
+        batchEntryBuilder.id(UUID.randomUUID().toString());
         batchEntryBuilder.messageBody(
                 NotificationSerializer.NotificationObjectMapper.writeValueAsString(notificationRequest)
         );
