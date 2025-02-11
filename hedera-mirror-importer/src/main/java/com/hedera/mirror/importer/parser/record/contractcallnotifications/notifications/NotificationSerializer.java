@@ -10,7 +10,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.hedera.mirror.common.converter.EntityIdDeserializer;
 import com.hedera.mirror.common.converter.EntityIdSerializer;
 import com.hedera.mirror.common.domain.entity.EntityId;
-import io.hypersistence.utils.hibernate.type.util.JsonConfiguration;
+
 import java.io.IOException;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
