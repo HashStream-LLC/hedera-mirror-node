@@ -1,15 +1,5 @@
 # This stack can be run to test out the HashStream fork locally
 services:
-  # The importer uses Redis and I don't know how to turn it off
-  # Giving in for now and just starting up a Redis instance
-  redis:
-    image: redis:6-alpine
-    ports:
-      - 6379:6379
-    restart: unless-stopped
-    stop_grace_period: 2m
-    stop_signal: SIGTERM
-    tty: true
   db:
     image: postgres:16-alpine
     environment:
