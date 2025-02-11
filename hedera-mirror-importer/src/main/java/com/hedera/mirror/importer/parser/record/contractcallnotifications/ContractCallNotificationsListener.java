@@ -59,11 +59,17 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     String[] ruleIds = rulesFinder.getMatchedRuleIds(contractIds);
 
     if (ruleIds.length == 0) {
-      log.debug("No matched rules. consensusTimestamp={}", consensusTimestamp);
+      log.debug("No matched rules. consensusTimestamp={}, contractIds={}", consensusTimestamp, contractIds);
       return;
     }
 
-    log.debug("Found {} matched rules", ruleIds.length);
+    log.debug(
+            "Found {} matched rules. consensusTimestamp={}, contractIds={}, ruleIds={}",
+            ruleIds.length,
+            consensusTimestamp,
+            contractIds,
+            ruleIds
+    );
     WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
     String eventId = EventId.toEventId(transactionModel.metadata());
 
