@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Log4j2
 @Component
@@ -74,7 +73,7 @@ public class StreamingRulesLoader {
         // TODO - handle possibility of pagination; for now, rules
         //   aren't coming in that fast
         ScanRequest request = getBaseQueryBuilder()
-                .indexName(_properties.getNewRulesGsi())
+                .indexName(_properties.getUnprocessedRulesGsi())
                 .build();
         ScanResponse scanResponse = _dynamoClient.scan(request);
         return scanResponse.items().stream().map(DynamoStreamingRule::toStreamingRule).toList();
@@ -89,7 +88,11 @@ public class StreamingRulesLoader {
             Map<String, AttributeValue> key = new HashMap<>();
             key.put("ruleId", AttributeValue.builder().s(rule.ruleId()).build());
 
-            log.info("Removing unprocessedSince from rule {}", rule.ruleId());
+            log.info(
+                    "Removing unprocessedSince from rule {}. GSI impacted: {}",
+                    rule.ruleId(),
+                    _properties.getUnprocessedRulesGsi()
+            );
             UpdateItemRequest updateRequest = UpdateItemRequest.builder()
                     .tableName(_properties.getStreamRulesTable())
                     .key(key)

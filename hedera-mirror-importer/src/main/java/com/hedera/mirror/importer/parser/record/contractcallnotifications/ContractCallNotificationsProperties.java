@@ -12,19 +12,19 @@ public class ContractCallNotificationsProperties {
     private final String dynamoEndpoint;
     private final String notificationsQueueUrl;
     private final String streamRulesTable;
-    private final String newRulesGsi;
+    private final String unprocessedRulesGsi;
 
     public ContractCallNotificationsProperties(boolean enabled,
                                                @DefaultValue("") String sqsEndpoint,
                                                @DefaultValue("") String dynamoEndpoint,
                                                String notificationsQueueUrl,
                                                String streamRulesTable,
-                                               String newRulesGsi) {
+                                               String unprocessedRulesGsi) {
         this.enabled = enabled;
         this.sqsEndpoint = sqsEndpoint;
         this.dynamoEndpoint = dynamoEndpoint;
         this.notificationsQueueUrl = notificationsQueueUrl;
         this.streamRulesTable = streamRulesTable;
-        this.newRulesGsi = newRulesGsi;
+        this.unprocessedRulesGsi = unprocessedRulesGsi;
     }
 }
