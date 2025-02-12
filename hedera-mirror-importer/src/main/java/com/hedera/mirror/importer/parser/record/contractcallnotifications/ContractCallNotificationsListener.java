@@ -134,7 +134,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             Instant.now()
     );
     log.info(
-            "Processed contract call transaction {}. Time since consensus: {}",
+            "Processed contract call transaction {}. Time since consensus: {} ms",
             consensusTimestamp,
             timeSinceConsensus.toMillis()
     );

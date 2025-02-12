@@ -25,7 +25,7 @@ public class NotificationEventConverter {
             ruleId,
                 eventId,
                 0,
-                NotificationEventStatus.Success,
+                NotificationEventStatus.Pending,
                 DestinationType.Webhook,
                 transactionModel,
                 PayloadCompression.None,
