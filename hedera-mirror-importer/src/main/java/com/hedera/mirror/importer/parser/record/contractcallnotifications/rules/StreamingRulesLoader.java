@@ -32,14 +32,20 @@ public class StreamingRulesLoader {
         _properties = properties;
     }
 
-    private ScanRequest.Builder getBaseQueryBuilder() {
-        // TODO - eventually optimize to get at enabled, contract call rules more efficiently with an index
+    private ScanRequest.Builder getBaseQueryBuilder(boolean getDisabledRules) {
+        // TODO - eventually optimize to get at enabled, contract call rules more efficiently with indices
+        //   For now, a scan with filtering is good enough
+        String filterExpression = getDisabledRules ?
+                "ruleType = :ruleType" :
+                "(attribute_not_exists(disabled) OR disabled = :falseVal) and ruleType = :ruleType";
         Map<String, AttributeValue> expressionValues = new HashMap<>();
-        expressionValues.put(":falseVal", AttributeValue.builder().bool(false).build());
         expressionValues.put(":ruleType", AttributeValue.builder().n(String.valueOf(ContractCallRuleType)).build());
+        if (!getDisabledRules) {
+            expressionValues.put(":falseVal", AttributeValue.builder().bool(false).build());
+        }
         return ScanRequest.builder()
                 .tableName(_properties.getStreamRulesTable())
-                .filterExpression("(attribute_not_exists(disabled) OR disabled = :falseVal) and ruleType = :ruleType")
+                .filterExpression(filterExpression)
                 .expressionAttributeValues(expressionValues);
     }
 
@@ -49,7 +55,7 @@ public class StreamingRulesLoader {
         ArrayList<StreamingRule> loadedRules = new ArrayList<>();
 
         do {
-            ScanRequest.Builder requestBuilder = getBaseQueryBuilder();
+            ScanRequest.Builder requestBuilder = getBaseQueryBuilder(false);
 
             if (lastEvaluatedKey != null) {
                 requestBuilder.exclusiveStartKey(lastEvaluatedKey);
@@ -69,18 +75,17 @@ public class StreamingRulesLoader {
         return loadedRules;
     }
 
-
-    private List<StreamingRule> loadNewRules() {
+    private List<StreamingRule> loadRuleUpdates() {
         // TODO - handle possibility of pagination; for now, rules
         //   aren't coming in that fast
-        ScanRequest request = getBaseQueryBuilder()
+        ScanRequest request = getBaseQueryBuilder(true)
                 .indexName(_properties.getUnprocessedRulesGsi())
                 .build();
         ScanResponse scanResponse = _dynamoClient.scan(request);
         return scanResponse.items().stream().map(DynamoStreamingRule::toStreamingRule).toList();
     }
 
-    private void updateProcessedRules(List<StreamingRule> newRules) {
+    private void setRulesAsProcessed(List<StreamingRule> newRules) {
         // Just doing this in a loop as:
         // 1. Bulk attribute removal wasn't working with my PartiQL statement
         // 2. I don't expect this list to get very big as processing will constantly be happening,
@@ -107,11 +112,11 @@ public class StreamingRulesLoader {
     @Scheduled(fixedRate = 5000) // Run every 5 seconds
     public void refreshRules() {
         if (_initialLoadCompleted) {
-            List<StreamingRule> newRules = loadNewRules();
-            if (!newRules.isEmpty()) {
-                _rulesStore.addRules(newRules);
-                log.info("Rules loaded (incremental load). {} records", newRules.size());
-                updateProcessedRules(newRules);
+            List<StreamingRule> ruleUpdates = loadRuleUpdates();
+            if (!ruleUpdates.isEmpty()) {
+                _rulesStore.processRules(ruleUpdates);
+                log.info("Rules loaded (incremental updates). {} records", ruleUpdates.size());
+                setRulesAsProcessed(ruleUpdates);
             }
             else {
                 log.debug("No new rules since last update");
@@ -119,8 +124,8 @@ public class StreamingRulesLoader {
         }
         else {
             List<StreamingRule> rules = loadAllEnabledRules();
-            _rulesStore.addRules(rules);
-            log.info("Rules loaded (all rules). {} records", rules.size());
+            _rulesStore.processRules(rules);
+            log.info("Rules loaded (all enabled rules). {} records", rules.size());
             _initialLoadCompleted = true;
         }
     }
