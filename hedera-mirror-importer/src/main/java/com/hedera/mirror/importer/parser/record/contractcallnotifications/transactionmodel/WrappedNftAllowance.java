@@ -1,5 +1,6 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hederahashgraph.api.proto.java.CryptoApproveAllowanceTransactionBody;
 import com.hederahashgraph.api.proto.java.NftAllowance;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedNftAllowance(
         String owner,
         String spender,

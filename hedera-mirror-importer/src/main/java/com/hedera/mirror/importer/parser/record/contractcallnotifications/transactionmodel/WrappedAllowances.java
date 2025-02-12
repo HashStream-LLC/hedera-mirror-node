@@ -1,5 +1,6 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hederahashgraph.api.proto.java.CryptoApproveAllowanceTransactionBody;
 import com.hederahashgraph.api.proto.java.CryptoDeleteAllowanceTransactionBody;
@@ -8,6 +9,7 @@ import com.hederahashgraph.api.proto.java.TransactionBody;
 import java.util.List;
 import java.util.Optional;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedAllowances(
         List<WrappedCryptoAllowance> crypto,
         List<WrappedTokenAllowance> tokens,

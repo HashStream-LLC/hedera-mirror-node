@@ -1,14 +1,14 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
-import com.hedera.mirror.common.domain.transaction.RecordItem;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hederahashgraph.api.proto.java.ExchangeRate;
-import com.hederahashgraph.api.proto.java.TimestampSeconds;
 import com.hederahashgraph.api.proto.java.TransactionReceipt;
 
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Function;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedExchangeRate(
         int centEquiv,
         int hbarEquiv,

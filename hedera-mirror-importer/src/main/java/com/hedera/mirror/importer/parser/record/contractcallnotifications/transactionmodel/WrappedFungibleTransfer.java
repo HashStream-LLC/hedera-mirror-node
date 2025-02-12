@@ -1,5 +1,6 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hederahashgraph.api.proto.java.TokenTransferList;
 import com.hederahashgraph.api.proto.java.TransactionRecord;
@@ -7,7 +8,7 @@ import com.hederahashgraph.api.proto.java.TransactionRecord;
 import java.util.List;
 import java.util.stream.Stream;
 
-// Concrete implementations of TokenTransfer
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedFungibleTransfer(
         String account,
         String tokenId,

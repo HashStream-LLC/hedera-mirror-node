@@ -1,9 +1,11 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hederahashgraph.api.proto.java.TransactionReceipt;
 
 import java.util.Optional;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedExchangeRateSet(
         Optional<WrappedExchangeRate> nextRate,
         Optional<WrappedExchangeRate> currentRate
