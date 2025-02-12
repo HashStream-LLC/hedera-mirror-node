@@ -25,7 +25,27 @@ public class StreamingRulesStore {
         _predicateToRuleMappings.put(rule.predicateValue(), ruleIds);
     }
 
-    public void addRules(List<StreamingRule> rules) {
-        rules.forEach(this::addRule);
+    public void removeRule(StreamingRule rule) {
+        Set<String> ruleIds = getRules(rule.predicateValue());
+        ruleIds.remove(rule.ruleId());
+        _predicateToRuleMappings.put(rule.predicateValue(), ruleIds);
+    }
+
+    /** Either include a rule update in the store or remove a rule that no longer needs
+     * to be tracked (disabled, deleted, etc.)
+     */
+    public void processRule(StreamingRule rule) {
+        if (rule.disabled()) {
+            removeRule(rule);
+        } else {
+            addRule(rule);
+        }
+    }
+
+    /** Either include a rule in the store or remove a rule that no longer needs
+     * to be tracked (disabled, deleted, etc.)
+     */
+    public void processRules(List<StreamingRule> rules) {
+        rules.forEach(this::processRule);
     }
 }
