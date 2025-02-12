@@ -1,6 +1,5 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hederahashgraph.api.proto.java.TransactionBody;
@@ -9,7 +8,6 @@ import com.hederahashgraph.api.proto.java.TransactionReceipt;
 import java.util.List;
 import java.util.Optional;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedReceipt(
         String status,
         Optional<String> accountId,
