@@ -82,7 +82,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             properties.getNotificationsQueueUrl(),
             eventId,
             transactionModel,
-            Stream.of(contractIds)
+            Stream.of(ruleIds)
     );
     log.debug(
             "Sending notification to SQS queue. consensusTimestamp={}, queueUrl={}",
