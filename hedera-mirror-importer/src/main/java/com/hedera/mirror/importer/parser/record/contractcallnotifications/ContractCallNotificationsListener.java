@@ -7,6 +7,7 @@ import com.hedera.mirror.importer.parser.record.RecordItemListener;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.dynamo.DynamoClientProvider;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.*;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.RulesFinder;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.StreamingRule;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
 import com.hedera.mirror.importer.util.Utility;
 import com.hederahashgraph.api.proto.java.Timestamp;
@@ -67,20 +68,23 @@ public class ContractCallNotificationsListener implements RecordItemListener {
       return;
     }
 
-    String[] ruleIds = rulesFinder.getMatchedRuleIds(contractIds);
+    StreamingRule[] rules = rulesFinder.getMatchedRules(contractIds);
 
-    if (ruleIds.length == 0) {
+    if (rules.length == 0) {
       log.debug("No matched rules. consensusDateTime={}, contractIds={}", consensusTimestamp, contractIds);
       return;
     }
 
-    log.debug(
-            "Found {} matched rules. consensusDateTime={}, contractIds={}, ruleIds={}",
-            ruleIds.length,
-            consensusTimestamp,
-            contractIds,
-            ruleIds
-    );
+    // Put here to avoid list iteration when at info or higher levels
+    if (log.isDebugEnabled()) {
+      log.debug(
+              "Found {} matched rules. consensusDateTime={}, contractIds={}, ruleIds={}",
+              rules.length,
+              consensusTimestamp,
+              contractIds,
+              Arrays.stream(rules).map(StreamingRule::ruleId)
+      );
+    }
 
     // Confirmed this is a contract call matching rules; get transaction model
     WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
@@ -90,7 +94,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     List<NotificationEvent> notificationEvents = notificationEventConverter.toNotificationEvents(
             eventId,
             transactionModel,
-            Arrays.stream(ruleIds),
+            Arrays.stream(rules),
             rawConsensusTimestamp
     );
     List<NotificationEventAuditPair> notificationEventPairs = notificationEventConverter.toPendingNotificationPairs(

@@ -17,8 +17,8 @@ public class DynamoNotificationEventConverter {
         return dateTime.format(timestampFormatter);
     }
 
-    /** Convert the transaction model into JSON suitable downstream in the notification events table */
-    public static String SerializeToString(WrappedTransactionModel value) {
+    /** Convert the notification payload into JSON suitable downstream in the notification events table */
+    public static String SerializeToString(NotificationPayload value) {
         try {
             return NotificationSerializer.NotificationObjectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {

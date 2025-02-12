@@ -1,33 +1,71 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
+import com.hedera.mirror.importer.ImporterProperties;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.StreamingRule;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
 import com.hederahashgraph.api.proto.java.Timestamp;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Stream;
 
 @Service
+@RequiredArgsConstructor
 public class NotificationEventConverter {
     // 90 days represented in seconds
     private static final int timeToLiveSeconds = 90 * 24 * 60;
+    private final ImporterProperties _importerProperties;
+
+    private NotificationPayload toNotificationPayload(
+            ZonedDateTime currentTime,
+            WrappedTransactionModel transactionModel,
+            StreamingRule rule,
+            Timestamp consensusTimestamp
+    ) {
+        ZonedDateTime consensusTimestampAsZonedDateTime = TimestampConverters.toZonedDatetime(consensusTimestamp);
+        Duration timeSinceConsensus = Duration.between(currentTime, consensusTimestampAsZonedDateTime);
+        NotificationMetadata metadata = new NotificationMetadata(
+                new NotificationRuleMetadata(
+                        rule.ruleId(),
+                        rule.ruleName(),
+                        rule.ruleType(),
+                        rule.predicateValue(),
+                        "hedera"
+                ),
+                _importerProperties.getNetwork().toLowerCase(),
+                ZonedDateTimeHandler.joinSecondsAndNanos(currentTime),
+                DurationHandler.joinSecondsAndNanos(timeSinceConsensus)
+        );
+        return new NotificationPayload(
+                metadata,
+                transactionModel
+        );
+    }
 
     public List<NotificationEvent> toNotificationEvents(
             String eventId,
             WrappedTransactionModel transactionModel,
-            Stream<String> ruleIds,
+            Stream<StreamingRule> rules,
             Timestamp consensusTimestamp
     ) {
         long timeToLive = ZonedDateTime.now().plusSeconds(timeToLiveSeconds).toEpochSecond();
         ZonedDateTime now = ZonedDateTime.now();
-        return ruleIds.map(ruleId -> new NotificationEvent(
-            ruleId,
+        return rules.map(rule -> new NotificationEvent(
+                rule.ruleId(),
                 eventId,
                 0,
                 NotificationEventStatus.Pending,
+                rule.actionWebhookUrl(),
                 DestinationType.Webhook,
-                transactionModel,
+                toNotificationPayload(
+                        now,
+                        transactionModel,
+                        rule,
+                        consensusTimestamp
+                ),
                 PayloadCompression.None,
                 TimestampConverters.toZonedDatetime(consensusTimestamp),
                 now,

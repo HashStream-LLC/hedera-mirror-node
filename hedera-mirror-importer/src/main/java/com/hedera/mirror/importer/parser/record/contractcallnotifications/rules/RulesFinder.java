@@ -14,9 +14,9 @@ public class RulesFinder {
     }
 
     /** Find all rules for the given list of contract ids */
-    public String[] getMatchedRuleIds(String[] contractIds) {
+    public StreamingRule[] getMatchedRules(String[] contractIds) {
         return Arrays.stream(contractIds)
                 .flatMap(contractId -> _rulesStore.getRules(contractId).stream())
-                .toArray(String[]::new);
+                .toArray(StreamingRule[]::new);
     }
 }
