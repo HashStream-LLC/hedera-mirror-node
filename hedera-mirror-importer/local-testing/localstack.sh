@@ -4,6 +4,7 @@ set -e
 
 endpointUrl=$DOCKER_INTERNAL_LOCALSTACK_ENDPOINT
 notificationQueue=$NOTIFICATION_QUEUE_NAME
+notificationEventsTable=$NOTIFICATION_EVENTS_TABLE
 streamRulesTable=$STREAM_RULES_TABLE
 unprocessedRulesGsi=$UNPROCESSED_RULES_GSI
 
@@ -53,5 +54,12 @@ aws dynamodb create-table \
         }
       }
     ]"
+
+aws dynamodb create-table \
+  --endpoint-url "$endpointUrl" \
+  --table-name "$notificationEventsTable" \
+  --attribute-definitions AttributeName=ruleId,AttributeType=S AttributeName=eventId,AttributeType=S \
+  --key-schema AttributeName=ruleId,KeyType=HASH AttributeName=eventId,KeyType=RANGE \
+  --provisioned-throughput 'ReadCapacityUnits=5,WriteCapacityUnits=5'
 
 echo "Successfully bootstrapped DynamoDB"

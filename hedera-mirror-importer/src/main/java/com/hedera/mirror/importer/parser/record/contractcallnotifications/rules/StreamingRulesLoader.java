@@ -1,6 +1,7 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.rules;
 
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.ContractCallNotificationsProperties;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.dynamo.DynamoClientProvider;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

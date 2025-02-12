@@ -1,4 +1,4 @@
-package com.hedera.mirror.importer.parser.record.contractcallnotifications.rules;
+package com.hedera.mirror.importer.parser.record.contractcallnotifications.dynamo;
 
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.ContractCallNotificationsProperties;
 import lombok.Getter;
