@@ -1,5 +1,6 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -30,6 +31,7 @@ public class NotificationSerializer extends JsonSerializer<Object> {
                 .registerModule(new Jdk8Module())
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .setSerializationInclusion(JsonInclude.Include.NON_NULL)
                 .setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE);
     }
 
