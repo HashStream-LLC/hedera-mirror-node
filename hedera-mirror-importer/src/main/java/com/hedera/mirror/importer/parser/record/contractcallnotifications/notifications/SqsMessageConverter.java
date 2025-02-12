@@ -1,8 +1,6 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
-import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
 
@@ -10,12 +8,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-@Service
-public class NotificationRequestConverter {
-    // SQS only allows sending messages in batches of 10
-    private final Integer MaxSqsBatchSize = 10;
-
-    private SendMessageBatchRequestEntry toSqsBatchEntry(NotificationRequest notificationRequest)
+public class SqsMessageConverter {
+    private SendMessageBatchRequestEntry toSqsBatchEntry(NotifiableQueueItem notificationRequest)
             throws JsonProcessingException {
         SendMessageBatchRequestEntry.Builder batchEntryBuilder = SendMessageBatchRequestEntry.builder();
         batchEntryBuilder.id(UUID.randomUUID().toString());
@@ -25,7 +19,7 @@ public class NotificationRequestConverter {
         return batchEntryBuilder.build();
     }
 
-    private SendMessageBatchRequest toSqsBatchRequest(String notificationQueueUrl, Stream<NotificationRequest> notificationRequests) {
+    private SendMessageBatchRequest toSqsBatchRequest(String notificationQueueUrl, Stream<NotifiableQueueItem> notificationRequests) {
         Stream<SendMessageBatchRequestEntry> messageBatchEntries = notificationRequests
                 .map(notificationRequest -> {
                     try {
@@ -42,16 +36,16 @@ public class NotificationRequestConverter {
 
     public List<SendMessageBatchRequest> toSqsRequests(
             String notificationQueueUrl,
-            String eventId,
-            WrappedTransactionModel transactionalModel,
-            Stream<String> ruleIds
+            Stream<NotificationEvent> notificationEvents
     ) {
-        Stream<NotificationRequest> notificationRequests = ruleIds.map(
-                ruleId -> new NotificationRequest(ruleId, eventId, transactionalModel)
+        Stream<NotifiableQueueItem> queueItems = notificationEvents.map(
+                notificationEvent -> new NotifiableQueueItem(notificationEvent.ruleId(), notificationEvent.eventId())
         );
-        List<List<NotificationRequest>> notificationRequestBatches = Batching.batchItems(
-                notificationRequests,
-                MaxSqsBatchSize
+        // SQS only allows sending messages in batches of 10
+        int maxSqsBatchSize = 10;
+        List<List<NotifiableQueueItem>> notificationRequestBatches = Batching.batchItems(
+                queueItems,
+                maxSqsBatchSize
         );
         return notificationRequestBatches.stream().map(notificationRequestsBatch ->
                 toSqsBatchRequest(notificationQueueUrl, notificationRequestsBatch.stream())

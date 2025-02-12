@@ -4,9 +4,8 @@ import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hedera.mirror.common.util.DomainUtils;
 import com.hedera.mirror.importer.exception.ImporterException;
 import com.hedera.mirror.importer.parser.record.RecordItemListener;
-import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.EventId;
-import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.NotificationRequestConverter;
-import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.SqsClientProvider;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.dynamo.DynamoClientProvider;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.*;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.RulesFinder;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
 import com.hedera.mirror.importer.util.Utility;
@@ -17,12 +16,14 @@ import jakarta.inject.Named;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.core.annotation.Order;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 @Log4j2
 @Named
@@ -34,7 +35,9 @@ public class ContractCallNotificationsListener implements RecordItemListener {
   private final ContractCallNotificationsProperties properties;
   private final SqsClientProvider sqsClientProvider;
   private final RulesFinder rulesFinder;
-  private final NotificationRequestConverter notificationRequestConverter;
+  private final NotificationEventConverter notificationEventConverter;
+  private final SqsMessageConverter sqsMessageConverter;
+  private final DynamoClientProvider dynamoClientProvider;
 
   private boolean isContractCallRelated(TransactionBody body) {
     return body.hasContractCall() || body.hasEthereumTransaction();
@@ -50,6 +53,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
 
     log.debug("Ingesting transaction. consensusTimestamp={}", consensusTimestamp);
 
+    // Filtering to only process contract calls with associated rule(s)
     if(!isContractCallRelated(body)) {
       log.debug("Ignoring non contract call transaction. consensusTimestamp={}", consensusTimestamp);
       return;
@@ -75,14 +79,33 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             contractIds,
             ruleIds
     );
+
+    // Confirmed this is a contract call matching rules; get transaction model
     WrappedTransactionModel transactionModel = WrappedTransactionModel.fromRecordItem(recordItem);
     String eventId = EventId.toEventId(transactionModel.metadata());
 
-    List<SendMessageBatchRequest> sqsBatchRequests = notificationRequestConverter.toSqsRequests(
-            properties.getNotificationsQueueUrl(),
+    // Get notification events
+    List<NotificationEvent> notificationEvents = notificationEventConverter.toNotificationEvents(
             eventId,
             transactionModel,
-            Stream.of(ruleIds)
+            Arrays.stream(ruleIds),
+            rawConsensusTimestamp
+    );
+
+    // Send events to Dynamo
+    List<BatchWriteItemRequest> notificationWriteRequests = DynamoBatchWriteConverter.toBatchWriteRequests(
+            properties.getNotificationsEventsTable(),
+            notificationEvents.stream()
+    );
+    DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
+    for (BatchWriteItemRequest notificationWriteRequest : notificationWriteRequests) {
+      dynamoClient.batchWriteItem(notificationWriteRequest);
+    }
+
+    // Send all notification requests to SQS to trigger processing
+    List<SendMessageBatchRequest> sqsBatchRequests = sqsMessageConverter.toSqsRequests(
+            properties.getNotificationsQueueUrl(),
+            notificationEvents.stream()
     );
     log.debug(
             "Sending notification to SQS queue. consensusTimestamp={}, queueUrl={}",
@@ -93,11 +116,10 @@ public class ContractCallNotificationsListener implements RecordItemListener {
       sqsClientProvider.getSqsClient().sendMessageBatch(sqsBatchRequest);
     }
 
-    Instant consensusTimestampAsInstant = Instant.ofEpochSecond(
-            rawConsensusTimestamp.getSeconds(),
-            rawConsensusTimestamp.getNanos()
+    Duration timeSinceConsensus = Duration.between(
+            TimestampConverters.toInstant(rawConsensusTimestamp),
+            Instant.now()
     );
-    Duration timeSinceConsensus = Duration.between(consensusTimestampAsInstant, Instant.now());
     log.info(
             "Processed contract call transaction {}. Time since consensus: {}",
             consensusTimestamp,
