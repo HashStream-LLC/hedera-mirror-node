@@ -57,7 +57,7 @@ public record WrappedTransactionMetadata(
                 transactionRecord.hasScheduleRef(),
                 ByteEncoder.toBase64String(transactionRecord.getTransactionHash()),
                 TransactionIdHandler.Stringify(transactionId),
-                transactionBody.getDataCase().name(),
+                transactionBody.getDataCase().getClass().getSimpleName(),
                 EntityId.of(transactionId.getAccountID()).toString(),
                 validDuration.map(Duration::getSeconds),
                 TimestampHandler.joinSecondsAndNanosWithPeriod(transactionId.getTransactionValidStart())
