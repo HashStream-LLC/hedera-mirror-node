@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 public class NotificationEventConverter {
     public List<NotificationEvent> toNotificationEvents(
             String eventId,
-            WrappedTransactionModel transactionalModel,
+            WrappedTransactionModel transactionModel,
             Stream<String> ruleIds,
             Timestamp consensusTimestamp
     ) {
@@ -21,7 +21,8 @@ public class NotificationEventConverter {
                 eventId,
                 NotificationEventStatus.Pending,
                 DestinationType.Webhook,
-                transactionalModel,
+                transactionModel,
+                PayloadCompression.None,
                 TimestampConverters.toZonedDatetime(consensusTimestamp),
                 ZonedDateTime.now()
         )).toList();

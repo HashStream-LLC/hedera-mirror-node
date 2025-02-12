@@ -10,5 +10,6 @@ public record NotificationEvent(
         int status,
         int destinationType,
         WrappedTransactionModel payload,
+        String payloadCompression,
         ZonedDateTime consensusTimestamp,
         ZonedDateTime streamsTimestamp) {}
