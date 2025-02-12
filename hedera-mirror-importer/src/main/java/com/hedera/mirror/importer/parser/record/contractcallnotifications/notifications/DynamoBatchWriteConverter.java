@@ -10,13 +10,12 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 public class DynamoBatchWriteConverter {
-    private static BatchWriteItemRequest toBatchWriteRequest(String notificationEventsTable, Stream<NotificationEvent> notificationEvents) {
-        Stream<Map<String, AttributeValue>> dynamoItems = notificationEvents.map(
-                DynamoNotificationEventConverter::fromNotificationEvent
-        );
-        Stream<WriteRequest> writeRequests = dynamoItems.map(dynamoItem ->
+    private static BatchWriteItemRequest toBatchWriteRequest(
+            String notificationEventsTable,
+            Stream<Map<String, AttributeValue>> dynamoDocuments) {
+        Stream<WriteRequest> writeRequests = dynamoDocuments.map(dynamoDocument ->
                 WriteRequest.builder().putRequest(
-                        PutRequest.builder().item(dynamoItem).build()
+                        PutRequest.builder().item(dynamoDocument).build()
                 ).build()
         );
         return BatchWriteItemRequest.builder()
@@ -26,16 +25,16 @@ public class DynamoBatchWriteConverter {
 
     public static List<BatchWriteItemRequest> toBatchWriteRequests(
         String notificationEventsTable,
-        Stream<NotificationEvent> notificationEvents
+        Stream<Map<String, AttributeValue>> dynamoDocuments
     ) {
         // Dynamo only allows sending messages in batches of 25
         int dynamoMaxBatchSize = 25;
-        List<List<NotificationEvent>> notificationEventBatches = Batching.batchItems(
-                notificationEvents,
+        List<List<Map<String, AttributeValue>>> documentBatches = Batching.batchItems(
+                dynamoDocuments,
                 dynamoMaxBatchSize
         );
-        return notificationEventBatches.stream().map(notificationEventBatch ->
-                toBatchWriteRequest(notificationEventsTable, notificationEventBatch.stream())
+        return documentBatches.stream().map(documentBatch ->
+                toBatchWriteRequest(notificationEventsTable, documentBatch.stream())
         ).toList();
     }
 }

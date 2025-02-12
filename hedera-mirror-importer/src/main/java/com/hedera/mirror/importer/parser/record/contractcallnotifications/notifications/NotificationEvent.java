@@ -7,9 +7,12 @@ import java.time.ZonedDateTime;
 public record NotificationEvent(
         String ruleId,
         String eventId,
+        int eventNumber,
         int status,
         int destinationType,
         WrappedTransactionModel payload,
         String payloadCompression,
-        ZonedDateTime consensusTimestamp,
-        ZonedDateTime streamsTimestamp) {}
+        ZonedDateTime consensusDateTime,
+        ZonedDateTime streamsDateTime,
+        ZonedDateTime dateTime,
+        long timeToLive) {}

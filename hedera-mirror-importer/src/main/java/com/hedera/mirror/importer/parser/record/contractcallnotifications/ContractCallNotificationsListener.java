@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.core.annotation.Order;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 
@@ -24,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Log4j2
 @Named
@@ -51,29 +53,29 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     Timestamp rawConsensusTimestamp = txRecord.getConsensusTimestamp();
     long consensusTimestamp = DomainUtils.timestampInNanosMax(rawConsensusTimestamp);
 
-    log.debug("Ingesting transaction. consensusTimestamp={}", consensusTimestamp);
+    log.debug("Ingesting transaction. consensusDateTime={}", consensusTimestamp);
 
     // Filtering to only process contract calls with associated rule(s)
     if(!isContractCallRelated(body)) {
-      log.debug("Ignoring non contract call transaction. consensusTimestamp={}", consensusTimestamp);
+      log.debug("Ignoring non contract call transaction. consensusDateTime={}", consensusTimestamp);
       return;
     }
 
     String[] contractIds = ContractIdExtractor.extractContractIds(recordItem);
     if (contractIds.length == 0) {
-      log.debug("No contract ids in contract call. consensusTimestamp={}", consensusTimestamp);
+      log.debug("No contract ids in contract call. consensusDateTime={}", consensusTimestamp);
       return;
     }
 
     String[] ruleIds = rulesFinder.getMatchedRuleIds(contractIds);
 
     if (ruleIds.length == 0) {
-      log.debug("No matched rules. consensusTimestamp={}, contractIds={}", consensusTimestamp, contractIds);
+      log.debug("No matched rules. consensusDateTime={}, contractIds={}", consensusTimestamp, contractIds);
       return;
     }
 
     log.debug(
-            "Found {} matched rules. consensusTimestamp={}, contractIds={}, ruleIds={}",
+            "Found {} matched rules. consensusDateTime={}, contractIds={}, ruleIds={}",
             ruleIds.length,
             consensusTimestamp,
             contractIds,
@@ -91,15 +93,21 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             Arrays.stream(ruleIds),
             rawConsensusTimestamp
     );
+    List<NotificationEventAuditPair> notificationEventPairs = notificationEventConverter.toPendingNotificationPairs(
+            notificationEvents
+    );
+    List<Map<String, AttributeValue>> dynamoDocuments = DynamoNotificationEventConverter.fromNotificationAuditPairs(
+            notificationEventPairs.stream()
+    );
 
     // Send events to Dynamo
     List<BatchWriteItemRequest> notificationWriteRequests = DynamoBatchWriteConverter.toBatchWriteRequests(
             properties.getNotificationsEventsTable(),
-            notificationEvents.stream()
+            dynamoDocuments.stream()
     );
     DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
     log.debug(
-            "Sending notification events to Dynamo. consensusTimestamp={}, dynamoTable={}",
+            "Sending notification events to Dynamo. consensusDateTime={}, dynamoTable={}",
             consensusTimestamp,
             properties.getNotificationsEventsTable()
     );
@@ -113,7 +121,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             notificationEvents.stream()
     );
     log.debug(
-            "Sending notification to SQS queue. consensusTimestamp={}, queueUrl={}",
+            "Sending notification to SQS queue. consensusDateTime={}, queueUrl={}",
             consensusTimestamp,
             properties.getNotificationsQueueUrl()
     );
