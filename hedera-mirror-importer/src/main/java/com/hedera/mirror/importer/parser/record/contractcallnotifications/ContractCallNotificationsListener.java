@@ -98,6 +98,11 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             notificationEvents.stream()
     );
     DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
+    log.debug(
+            "Sending notification events to Dynamo. consensusTimestamp={}, dynamoTable={}",
+            consensusTimestamp,
+            properties.getNotificationsEventsTable()
+    );
     for (BatchWriteItemRequest notificationWriteRequest : notificationWriteRequests) {
       dynamoClient.batchWriteItem(notificationWriteRequest);
     }

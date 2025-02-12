@@ -1,6 +1,7 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
 
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+@Service
 public class SqsMessageConverter {
     private SendMessageBatchRequestEntry toSqsBatchEntry(NotifiableQueueItem notificationRequest)
             throws JsonProcessingException {
