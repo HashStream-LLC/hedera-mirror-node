@@ -1,13 +1,11 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hederahashgraph.api.proto.java.*;
 
 import java.util.Optional;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedTransactionMetadata(
         String consensusTimestamp,
         long chargedTxFee,
@@ -57,7 +55,7 @@ public record WrappedTransactionMetadata(
                 transactionRecord.hasScheduleRef(),
                 ByteEncoder.toBase64String(transactionRecord.getTransactionHash()),
                 TransactionIdHandler.Stringify(transactionId),
-                transactionBody.getDataCase().getClass().getSimpleName(),
+                transactionBody.getDataCase().name(),
                 EntityId.of(transactionId.getAccountID()).toString(),
                 validDuration.map(Duration::getSeconds),
                 TimestampHandler.joinSecondsAndNanosWithPeriod(transactionId.getTransactionValidStart())

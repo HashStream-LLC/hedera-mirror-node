@@ -1,13 +1,11 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hederahashgraph.api.proto.java.ContractLoginfo;
 
 import java.util.List;
 import java.util.stream.Stream;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedContractCallLogInfo(
         String contractId,
         String bloom,
