@@ -45,8 +45,8 @@ public record WrappedReceipt(
         );
         Optional<String> contractId = OptionalHandler.mapEntityIdStringIfPopulated(
                 receipt,
-                TransactionReceipt::hasFileID,
-                r -> EntityId.of(r.getFileID())
+                TransactionReceipt::hasContractID,
+                r -> EntityId.of(r.getContractID())
         );
         Optional<String> scheduledTransactionId = OptionalHandler.mapIfPopulated(
                 receipt,
