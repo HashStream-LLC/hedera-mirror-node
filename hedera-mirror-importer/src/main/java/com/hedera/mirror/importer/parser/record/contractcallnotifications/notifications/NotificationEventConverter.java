@@ -26,7 +26,7 @@ public class NotificationEventConverter {
             Timestamp consensusTimestamp
     ) {
         ZonedDateTime consensusTimestampAsZonedDateTime = TimestampConverters.toZonedDatetime(consensusTimestamp);
-        Duration timeSinceConsensus = Duration.between(currentTime, consensusTimestampAsZonedDateTime);
+        Duration timeSinceConsensus = Duration.between(consensusTimestampAsZonedDateTime, currentTime);
         NotificationMetadata metadata = new NotificationMetadata(
                 new NotificationRuleMetadata(
                         rule.ruleId(),

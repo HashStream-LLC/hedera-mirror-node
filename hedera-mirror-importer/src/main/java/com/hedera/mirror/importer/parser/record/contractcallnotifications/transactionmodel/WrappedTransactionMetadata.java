@@ -1,12 +1,13 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel;
 
-import com.google.protobuf.AbstractMessage;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hederahashgraph.api.proto.java.*;
 
 import java.util.Optional;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record WrappedTransactionMetadata(
         String consensusTimestamp,
         long chargedTxFee,
@@ -35,8 +36,8 @@ public record WrappedTransactionMetadata(
         );
         Optional<Timestamp> parentConsensusTimestamp = OptionalHandler.mapIfPopulated(
                 transactionRecord,
-                TransactionRecord::hasConsensusTimestamp,
-                TransactionRecord::getConsensusTimestamp
+                TransactionRecord::hasParentConsensusTimestamp,
+                TransactionRecord::getParentConsensusTimestamp
         );
 
         Optional<Duration> validDuration = OptionalHandler.mapIfPopulated(
