@@ -48,6 +48,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
 
   @Override
   public void onItem(RecordItem recordItem) throws ImporterException {
+    Instant processingStartTime = Instant.now();
     TransactionBody body = recordItem.getTransactionBody();
     TransactionRecord txRecord = recordItem.getTransactionRecord();
     log.trace("Storing transaction body: {}", () -> Utility.printProtoMessage(body));
@@ -133,14 +134,21 @@ public class ContractCallNotificationsListener implements RecordItemListener {
       sqsClientProvider.getSqsClient().sendMessageBatch(sqsBatchRequest);
     }
 
+    Instant endProcessingTime = Instant.now();
     Duration timeSinceConsensus = Duration.between(
             TimestampConverters.toInstant(rawConsensusTimestamp),
-            Instant.now()
+            endProcessingTime
+    );
+    Duration timeSpentProcessing = Duration.between(
+            processingStartTime,
+            endProcessingTime
     );
     log.info(
-            "Processed contract call transaction {}. Time since consensus: {} ms",
+            "Processed contract call transaction with consensus timestamp {}. Processing start time: {} Time since consensus: {} ms. Time spent processing: {} ms",
             consensusTimestamp,
-            timeSinceConsensus.toMillis()
+            DomainUtils.convertToNanosMax(processingStartTime),
+            timeSinceConsensus.toMillis(),
+            timeSpentProcessing.toMillis()
     );
   }
 }
