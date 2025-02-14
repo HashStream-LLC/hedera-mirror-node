@@ -144,7 +144,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             endProcessingTime
     );
     log.info(
-            "Processed contract call transaction with consensus timestamp {}. Processing start time: {} Time since consensus: {} ms. Time spent processing: {} ms",
+            "Processed contract call transaction with consensus timestamp {}. Processing start time: {}. Time since consensus: {} ms. Time spent processing: {} ms",
             consensusTimestamp,
             DomainUtils.convertToNanosMax(processingStartTime),
             timeSinceConsensus.toMillis(),
