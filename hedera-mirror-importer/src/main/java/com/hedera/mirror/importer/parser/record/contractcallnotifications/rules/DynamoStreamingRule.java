@@ -7,7 +7,7 @@ import java.util.Map;
 public class DynamoStreamingRule {
   public static StreamingRule toStreamingRule(Map<String, AttributeValue> dynamoRecord) {
     return new StreamingRule(
-        dynamoRecord.get("organizationId").s(),
+        dynamoRecord.containsKey("organizationId") ? dynamoRecord.get("organizationId").s() : "unknown",
         dynamoRecord.get("ruleId").s(),
         dynamoRecord.get("ruleName").s(),
         Integer.parseInt(dynamoRecord.get("ruleType").n()),

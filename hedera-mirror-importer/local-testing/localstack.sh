@@ -45,8 +45,7 @@ aws dynamodb create-table \
           {\"AttributeName\":\"unprocessedSince\",\"KeyType\":\"RANGE\"}
         ],
         \"Projection\": {
-          \"ProjectionType\":\"INCLUDE\",
-          \"NonKeyAttributes\":[\"ruleType\", \"predicateValue\", \"disabled\"]
+          \"ProjectionType\":\"ALL\"
         },
         \"ProvisionedThroughput\": {
           \"ReadCapacityUnits\": 5,
