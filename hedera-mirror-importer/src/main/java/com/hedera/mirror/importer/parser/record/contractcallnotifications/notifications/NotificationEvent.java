@@ -5,15 +5,17 @@ import com.hedera.mirror.importer.parser.record.contractcallnotifications.transa
 import java.time.ZonedDateTime;
 
 public record NotificationEvent(
-        String ruleId,
-        String eventId,
-        int eventNumber,
-        int status,
-        String destination,
-        int destinationType,
-        NotificationPayload payload,
-        String payloadCompression,
-        ZonedDateTime consensusDateTime,
-        ZonedDateTime streamsDateTime,
-        ZonedDateTime dateTime,
-        long timeToLive) {}
+    String organizationId,
+    String ruleId,
+    String eventId,
+    int eventNumber,
+    int status,
+    String destination,
+    int destinationType,
+    NotificationPayload payload,
+    String payloadCompression,
+    ZonedDateTime consensusDateTime,
+    ZonedDateTime streamsDateTime,
+    ZonedDateTime dateTime,
+    long timeToLive) {
+}
