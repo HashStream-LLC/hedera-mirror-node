@@ -20,6 +20,8 @@ import org.springframework.core.annotation.Order;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemResponse;
+import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 
 import java.time.Duration;
@@ -41,9 +43,38 @@ public class ContractCallNotificationsListener implements RecordItemListener {
   private final NotificationEventConverter notificationEventConverter;
   private final SqsMessageConverter sqsMessageConverter;
   private final DynamoClientProvider dynamoClientProvider;
+  private static final int maxDynamoBatchWriteAttempts = 5;
 
   private boolean isContractCallRelated(TransactionBody body) {
     return body.hasContractCall() || body.hasEthereumTransaction();
+  }
+
+  /**
+   * Write all the provided items to Dynamo. If any items come back unprocessed,
+   * attempt to write until the "batchAttemptsMadeAlready" value exceeds the "maxDynamoBatchWriteAttempts"
+   * @param writeRequest The requests to write to Dynamo
+   * @param batchAttemptsMadeAlready How many times have items in this batch already been attempted
+   */
+  private void writeBatchToDynamo(BatchWriteItemRequest writeRequest, int batchAttemptsMadeAlready) {
+    DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
+
+    int attempt = batchAttemptsMadeAlready + 1;
+    if (attempt > maxDynamoBatchWriteAttempts) {
+      throw new RuntimeException(String.format("Exceeded batch write attempts; attempts made: %d", attempt));
+    }
+
+    BatchWriteItemResponse batchWriteResponse = dynamoClient.batchWriteItem(writeRequest);
+    if (batchWriteResponse.hasUnprocessedItems() && !batchWriteResponse.unprocessedItems().isEmpty()) {
+      Map<String, List<WriteRequest>> unprocessedItems = batchWriteResponse.unprocessedItems();
+      int remainingItemCount = unprocessedItems.get(properties.getNotificationsEventsTable()).size();
+      log.info(
+              "Batch not fully processed. {} items remain to-be-processed after attempt {}. Re-attempting write of those unprocessed items",
+              remainingItemCount,
+              attempt
+      );
+      BatchWriteItemRequest retryRequest = BatchWriteItemRequest.builder().requestItems(unprocessedItems).build();
+      writeBatchToDynamo(retryRequest, attempt);
+    }
   }
 
   @Override
@@ -110,14 +141,13 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             properties.getNotificationsEventsTable(),
             dynamoDocuments.stream()
     );
-    DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
     log.debug(
             "Sending notification events to Dynamo. consensusDateTime={}, dynamoTable={}",
             consensusTimestamp,
             properties.getNotificationsEventsTable()
     );
     for (BatchWriteItemRequest notificationWriteRequest : notificationWriteRequests) {
-      dynamoClient.batchWriteItem(notificationWriteRequest);
+      writeBatchToDynamo(notificationWriteRequest, 0);
     }
 
     // Send all notification requests to SQS to trigger processing
