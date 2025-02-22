@@ -52,10 +52,10 @@ public class ContractCallNotificationsListener implements RecordItemListener {
   /**
    * Write all the provided items to Dynamo. If any items come back unprocessed,
    * attempt to write until the "batchAttemptsMadeAlready" value exceeds the "maxDynamoBatchWriteAttempts"
-   * @param notificationWriteRequest The requests to write to Dynamo
+   * @param writeRequest The requests to write to Dynamo
    * @param batchAttemptsMadeAlready How many times have items in this batch already been attempted
    */
-  private void writeToDynamo(BatchWriteItemRequest notificationWriteRequest, int batchAttemptsMadeAlready) {
+  private void writeBatchToDynamo(BatchWriteItemRequest writeRequest, int batchAttemptsMadeAlready) {
     DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
 
     int attempt = batchAttemptsMadeAlready + 1;
@@ -63,7 +63,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
       throw new RuntimeException(String.format("Exceeded batch write attempts; attempts made: %d", attempt));
     }
 
-    BatchWriteItemResponse batchWriteResponse = dynamoClient.batchWriteItem(notificationWriteRequest);
+    BatchWriteItemResponse batchWriteResponse = dynamoClient.batchWriteItem(writeRequest);
     if (batchWriteResponse.hasUnprocessedItems() && !batchWriteResponse.unprocessedItems().isEmpty()) {
       Map<String, List<WriteRequest>> unprocessedItems = batchWriteResponse.unprocessedItems();
       int remainingItemCount = unprocessedItems.get(properties.getNotificationsEventsTable()).size();
@@ -73,7 +73,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
               attempt
       );
       BatchWriteItemRequest retryRequest = BatchWriteItemRequest.builder().requestItems(unprocessedItems).build();
-      writeToDynamo(retryRequest, attempt);
+      writeBatchToDynamo(retryRequest, attempt);
     }
   }
 
@@ -147,7 +147,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             properties.getNotificationsEventsTable()
     );
     for (BatchWriteItemRequest notificationWriteRequest : notificationWriteRequests) {
-      writeToDynamo(notificationWriteRequest, 0);
+      writeBatchToDynamo(notificationWriteRequest, 0);
     }
 
     // Send all notification requests to SQS to trigger processing
