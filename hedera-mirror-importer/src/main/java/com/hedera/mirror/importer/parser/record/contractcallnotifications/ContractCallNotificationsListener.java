@@ -4,6 +4,7 @@ import com.hedera.mirror.common.domain.transaction.RecordItem;
 import com.hedera.mirror.common.util.DomainUtils;
 import com.hedera.mirror.importer.exception.ImporterException;
 import com.hedera.mirror.importer.parser.record.RecordItemListener;
+import com.hedera.mirror.importer.parser.record.contractcallnotifications.backoff.ExponentialBackoff;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.dynamo.DynamoClientProvider;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications.*;
 import com.hedera.mirror.importer.parser.record.contractcallnotifications.rules.RulesFinder;
@@ -55,7 +56,7 @@ public class ContractCallNotificationsListener implements RecordItemListener {
    * @param writeRequest The requests to write to Dynamo
    * @param batchAttemptsMadeAlready How many times have items in this batch already been attempted
    */
-  private void writeBatchToDynamo(BatchWriteItemRequest writeRequest, int batchAttemptsMadeAlready) {
+  private void writeBatchToDynamo(BatchWriteItemRequest writeRequest, int batchAttemptsMadeAlready) throws InterruptedException {
     DynamoDbClient dynamoClient = dynamoClientProvider.getDynamoClient();
 
     int attempt = batchAttemptsMadeAlready + 1;
@@ -67,11 +68,14 @@ public class ContractCallNotificationsListener implements RecordItemListener {
     if (batchWriteResponse.hasUnprocessedItems() && !batchWriteResponse.unprocessedItems().isEmpty()) {
       Map<String, List<WriteRequest>> unprocessedItems = batchWriteResponse.unprocessedItems();
       int remainingItemCount = unprocessedItems.get(properties.getNotificationsEventsTable()).size();
+      long delayInMillis = ExponentialBackoff.getBackoffDelayInMilliseconds(1000, attempt);
       log.info(
-              "Batch not fully processed. {} items remain to-be-processed after attempt {}. Re-attempting write of those unprocessed items",
+              "Batch not fully processed. {} items remain to-be-processed after attempt {}. Re-attempting write of those unprocessed items after {} milliseconds",
               remainingItemCount,
-              attempt
+              attempt,
+              delayInMillis
       );
+      Thread.sleep(delayInMillis);
       BatchWriteItemRequest retryRequest = BatchWriteItemRequest.builder().requestItems(unprocessedItems).build();
       writeBatchToDynamo(retryRequest, attempt);
     }
@@ -147,7 +151,12 @@ public class ContractCallNotificationsListener implements RecordItemListener {
             properties.getNotificationsEventsTable()
     );
     for (BatchWriteItemRequest notificationWriteRequest : notificationWriteRequests) {
-      writeBatchToDynamo(notificationWriteRequest, 0);
+        try {
+            writeBatchToDynamo(notificationWriteRequest, 0);
+        } catch (InterruptedException e) {
+          log.warn("Write to Dynamo interrupted");
+          throw new RuntimeException(e);
+        }
     }
 
     // Send all notification requests to SQS to trigger processing
