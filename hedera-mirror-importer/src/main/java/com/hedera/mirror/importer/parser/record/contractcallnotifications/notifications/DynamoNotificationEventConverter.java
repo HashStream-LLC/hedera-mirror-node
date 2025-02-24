@@ -1,15 +1,21 @@
 package com.hedera.mirror.importer.parser.record.contractcallnotifications.notifications;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.hedera.mirror.importer.parser.record.contractcallnotifications.transactionmodel.WrappedTransactionModel;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.Stream;
-
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
+import org.w3c.dom.Attr;
+
+import lombok.extern.log4j.Log4j2;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+
+@Log4j2
 public class DynamoNotificationEventConverter {
   private static final DateTimeFormatter timestampFormatter = DateTimeFormatter.ISO_INSTANT;
 
@@ -29,6 +35,10 @@ public class DynamoNotificationEventConverter {
     }
   }
 
+  public static AttributeValue toByteAttribute(byte[] value) {
+    return AttributeValue.builder().b(value).build();
+  }
+
   public static AttributeValue toStringAttribute(String value) {
     return AttributeValue.builder().s(value).build();
   }
@@ -45,9 +55,24 @@ public class DynamoNotificationEventConverter {
     return AttributeValue.builder().n(String.valueOf(value)).build();
   }
 
+  /**
+   * Compresses a string using GZIP and returns the resulting byte array.
+   */
+  public static byte[] compressString(String data) throws IOException {
+    if (data == null || data.isEmpty()) {
+      return new byte[0];
+    }
+    ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+    try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
+      gzipStream.write(data.getBytes(StandardCharsets.UTF_8));
+    }
+    return byteStream.toByteArray();
+  }
+
   public static Map<String, AttributeValue> fromNotificationEvent(NotificationEvent event) {
     String serializedPayload = SerializeToString(event.payload());
-    return Map.ofEntries(
+
+    Map attributeValues = Map.ofEntries(
         Map.entry("organizationId", toStringAttribute(event.organizationId())),
         Map.entry("ruleId", toStringAttribute(event.ruleId())),
         Map.entry("eventId", toStringAttribute(event.eventId())),
@@ -60,6 +85,20 @@ public class DynamoNotificationEventConverter {
         Map.entry("timeToLive", toNumberAttribute(event.timeToLive())),
         Map.entry("payloadCompression", toStringAttribute(event.payloadCompression())),
         Map.entry("dateTime", toStringAttribute(ZonedDateTime.now())));
+
+    if (serializedPayload.length() > 2000) {
+      try {
+        byte[] compressedPayload = compressString(serializedPayload);
+        attributeValues.put("payload", toByteAttribute(compressedPayload));
+        attributeValues.put("compressedPayload", toStringAttribute("gzip"));
+      } catch (IOException e) {
+        log.error("Failed to compress payload for event {}", event.eventId(), e);
+        attributeValues.put("payload", toStringAttribute(serializedPayload));
+        attributeValues.put("compressedPayload", toStringAttribute(event.payloadCompression()));
+      }
+    }
+
+    return attributeValues;
   }
 
   public static Map<String, AttributeValue> fromNotificationAuditEvent(NotificationAuditEvent event) {
