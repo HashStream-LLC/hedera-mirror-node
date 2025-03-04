@@ -22,8 +22,9 @@ import static org.mockito.Mockito.when;
 
 import com.hedera.hapi.node.base.AccountID;
 import com.hedera.hapi.node.state.token.Account;
-import com.hedera.mirror.web3.state.AccountReadableKVState;
-import com.hedera.mirror.web3.state.AliasesReadableKVState;
+import com.hedera.mirror.web3.ContextExtension;
+import com.hedera.mirror.web3.state.keyvalue.AccountReadableKVState;
+import com.hedera.mirror.web3.state.keyvalue.AliasesReadableKVState;
 import com.swirlds.state.spi.ReadableKVState;
 import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
+@ExtendWith(ContextExtension.class)
 @ExtendWith(MockitoExtension.class)
 class MapWritableKVStateTest {
 
@@ -94,8 +96,7 @@ class MapWritableKVStateTest {
     void testCommit() {
         mapWritableKVState.putIntoDataSource(accountID, account);
         assertThat(mapWritableKVState.contains(accountID)).isTrue();
-        mapWritableKVState.commit();
-        assertThat(mapWritableKVState.contains(accountID)).isFalse();
+        mapWritableKVState.commit(); // Does nothing, just for test coverage.
     }
 
     @Test

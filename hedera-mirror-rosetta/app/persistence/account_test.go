@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/hashgraph/hedera-mirror-node/hedera-mirror-rosetta/app/domain/types"
-	"github.com/hashgraph/hedera-mirror-node/hedera-mirror-rosetta/app/errors"
-	"github.com/hashgraph/hedera-mirror-node/hedera-mirror-rosetta/app/persistence/domain"
-	tdomain "github.com/hashgraph/hedera-mirror-node/hedera-mirror-rosetta/test/domain"
-	"github.com/hashgraph/hedera-sdk-go/v2"
+	"github.com/hiero-ledger/hiero-mirror-node/hedera-mirror-rosetta/app/domain/types"
+	"github.com/hiero-ledger/hiero-mirror-node/hedera-mirror-rosetta/app/errors"
+	"github.com/hiero-ledger/hiero-mirror-node/hedera-mirror-rosetta/app/persistence/domain"
+	tdomain "github.com/hiero-ledger/hiero-mirror-node/hedera-mirror-rosetta/test/domain"
+	"github.com/hiero-ledger/hiero-sdk-go/v2/sdk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/thanhpk/randstr"
@@ -488,7 +488,7 @@ type accountRepositoryWithAliasSuite struct {
 func (suite *accountRepositoryWithAliasSuite) SetupSuite() {
 	suite.accountRepositorySuite.SetupSuite()
 
-	sk, err := hedera.PrivateKeyGenerateEd25519()
+	sk, err := hiero.PrivateKeyGenerateEd25519()
 	if err != nil {
 		panic(err)
 	}

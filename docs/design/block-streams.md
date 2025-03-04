@@ -37,7 +37,8 @@ package com.hedera.mirror.common.domain.transaction;
 public record BlockItem(Transaction transaction,
                         TransactionResult transactionResult,
                         List<TransactionOutput> transactionOutput, // Note: List may be empty
-                        Optional<StateChanges> stateChanges) implements StreamItem {}
+                        List<StateChanges> stateChanges // Note: List may be empty
+) implements StreamItem {}
 ```
 
 #### BlockFile
@@ -57,6 +58,7 @@ Update the handling of the topic message `runningHashVersion`:
 - Update `ConsensusSubmitMessageTransactionHandler` to account for block streams no longer sending the runningHashVersion value:
   - If the TransactionReceipt runningHashVersion is 3 (the current value) set the runningHashVersion to null.
   - If the TransactionReceipt runningHashVersion is not 3 set the runningHashVersion to that value.
+- The `ConsensusSubmitMessageTransformer`, when transforming a block item to a record item, will set the topic message receipt runningHashVersion to 3.
 
 ### Interfaces and Classes
 
@@ -102,41 +104,11 @@ package com.hedera.mirror.importer.downloader.block;
 public class BlockFileTransformer implements StreamFileTransformer<RecordFile, BlockFile> {
 
     /**
-     *   Transforms the block file into a record file and calculates the block hash
-     *   The transformation uses a mapping of block fields to record file fields
-     *   Block items are only iterated once in the transform method
-     *   State changes are accumulated and used for calculating the block hash
-     *
-     *   If the Block File contains a Wrapped Record File, then convert the Wrapped Record File to a Record File
+     *   Transforms the block file into a record file. The transformation uses a mapping of block fields to record file
+     *   fields. Block items are only iterated once in the transform method.
      */
     @Override
     public RecordFile transform(BlockFile block);
-
-    /**
-     *   Block Items list needs to include the block items of the following type to calculate the
-     *   hash for the Root of Output Merkle Tree:
-     *      - BlockHeader
-     *      - TransactionOutput
-     *      - StateChange
-     */
-    private byte[] calculateOutputTreeRootHash(List<BlockItem> blockItems);
-
-    /**
-     *   Block hashes are not included in the block. They must be calculated from the contents of the block.
-     *
-     *   The `previousBlockHash` is located in the BlockHeader
-     *   The `inputTreeRootHash` is located in the BlockStreamInfo of the last StateChange of the block
-     *   The `startOfBlockStateRootHash` is located in the BlockProof
-    */
-    private byte[] calculateBlockHash(
-            byte[] previousBlockHash,
-            byte[] inputTreeRootHash,
-            byte[] outputTreeRootHash,
-            byte[] startOfBlockStateRootHash
-    );
-
-    // The transaction hash will not be included in the block stream output so we will need to calculate it
-    private byte[] calculateTransactionHash(EventTransaction transaction);
 }
 ```
 
@@ -176,32 +148,32 @@ public class BlockStreamPoller extends StreamPoller<BlockFile> {
 }
 ```
 
-#### StreamFileNotifier
-
--Rename `verified` to `notify` as blocks will not be verifiable until each state change has been processed by the BlockStreamVerifier.
-
 #### BlockStreamVerifier
 
 ```java
 package com.hedera.mirror.importer.downloader.block;
 
 public class BlockStreamVerifier {
-    private final StreamFileNotifier streamFileNotifier;
     private final StreamFileTransformer<RecordFile, BlockFile> blockFileTransformer;
     private final RecordFileParser recordFileParser;
+    private final StreamFileNotifier streamFileNotifier;
 
     /**
-     * Transforms the block file into a record file, verifies the hash chain and then parses it
+     * Verifies the block file, transforms it into a record file, and then notifies the parser
      */
-    public void notify(@Nonnull StreamFile<?> streamFile);
+    public void verify(@NotNull BlockFile blockFile);
 
     /**
-     * For Block N the hash must be verified to match the previousBlockHash protobuf value provided by Block N+1
+     * Verifies the block number of the block file
+     * - that the block number is one after the previous block number if exists
+     * - that the block number from the file name matches the block number in the block
      */
-    private void verifyHashChain(String expected, String actual);
+    private void verifyBlockNumber(BlockFile blockFile);
 
-    // Verifies that the number of the block file contained in its file name matches the block number within the block file
-    private void verifyBlockNumber(String expected, String actual);
+    /**
+     * The previous hash from the block must match the hash of the previous block
+     */
+    private void verifyHashChain(BlockFile blockFile);
 }
 ```
 
@@ -222,7 +194,7 @@ alter table if exists record_file
     add column if not exists round_end                     bigint       null;
 
 alter table if exists topic_message
-    alter column if exists running_hash_version drop not null;
+    alter column running_hash_version drop not null;
 ```
 
 ### Block to Record File Transformation

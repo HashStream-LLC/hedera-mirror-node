@@ -17,7 +17,9 @@
 package com.hedera.mirror.web3.state.components;
 
 import com.hedera.node.internal.network.Network;
+import com.swirlds.config.api.Configuration;
 import com.swirlds.state.lifecycle.StartupNetworks;
+import jakarta.annotation.Nonnull;
 import jakarta.inject.Named;
 import java.util.Optional;
 
@@ -25,12 +27,12 @@ import java.util.Optional;
 public class StartupNetworksImpl implements StartupNetworks {
 
     @Override
-    public Network genesisNetworkOrThrow() {
+    public Network genesisNetworkOrThrow(@Nonnull Configuration platformConfig) {
         return Network.DEFAULT;
     }
 
     @Override
-    public Optional<Network> overrideNetworkFor(long roundNumber) {
+    public Optional<Network> overrideNetworkFor(long roundNumber, Configuration platformConfig) {
         return Optional.empty();
     }
 
@@ -44,9 +46,13 @@ public class StartupNetworksImpl implements StartupNetworks {
         // This is a no-op in the current context, and other implementations may provide behavior.
     }
 
-    @SuppressWarnings("deprecation")
+    /**
+     * @deprecated in the StartupNetworks interface
+     */
+    @SuppressWarnings({"java:S1133", "java:S6355"})
+    @Deprecated
     @Override
-    public Network migrationNetworkOrThrow() {
+    public Network migrationNetworkOrThrow(Configuration platformConfig) {
         return Network.DEFAULT;
     }
 }

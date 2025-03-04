@@ -23,9 +23,9 @@ import com.google.common.collect.Range;
 import com.hedera.mirror.common.domain.balance.AccountBalance;
 import com.hedera.mirror.common.domain.balance.TokenBalance;
 import com.hedera.mirror.common.domain.entity.EntityId;
+import com.hedera.mirror.importer.DisableRepeatableSqlMigration;
 import com.hedera.mirror.importer.EnabledIfV1;
 import com.hedera.mirror.importer.ImporterIntegrationTest;
-import com.hedera.mirror.importer.config.Owner;
 import com.hedera.mirror.importer.db.TimePartition;
 import com.hedera.mirror.importer.db.TimePartitionService;
 import com.hedera.mirror.importer.repository.AccountBalanceRepository;
@@ -51,15 +51,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.util.StreamUtils;
 
+@DisablePartitionMaintenance
+@DisableRepeatableSqlMigration
 @EnabledIfV1
-@Import(DisablePartitionMaintenanceConfiguration.class)
 @RequiredArgsConstructor
 @Tag("migration")
 @TestPropertySource(properties = "spring.flyway.target=1.89.1")
@@ -75,9 +74,6 @@ class TimePartitionBalanceTablesMigrationTest extends ImporterIntegrationTest {
 
     private final AccountBalanceRepository accountBalanceRepository;
 
-    @Owner
-    private final JdbcTemplate jdbcTemplate;
-
     @Value("classpath:db/migration/v1/V1.89.2__time_partition_balance_tables.sql")
     private final Resource migrationSql;
 
@@ -87,7 +83,7 @@ class TimePartitionBalanceTablesMigrationTest extends ImporterIntegrationTest {
 
     @AfterEach
     void cleanup() {
-        jdbcTemplate.execute(CLEANUP_SQL);
+        ownerJdbcTemplate.execute(CLEANUP_SQL);
     }
 
     @ParameterizedTest
@@ -337,7 +333,7 @@ class TimePartitionBalanceTablesMigrationTest extends ImporterIntegrationTest {
 
     private Optional<Long> getSentinelTimestamp() {
         try {
-            return Optional.ofNullable(jdbcTemplate.queryForObject(
+            return Optional.ofNullable(jdbcOperations.queryForObject(
                     "select balance from account_balance_old where consensus_timestamp = -1 and account_id = -1",
                     Long.class));
         } catch (EmptyResultDataAccessException ex) {
@@ -373,7 +369,7 @@ class TimePartitionBalanceTablesMigrationTest extends ImporterIntegrationTest {
             var script = StreamUtils.copyToString(is, StandardCharsets.UTF_8)
                     .replaceAll("\\$\\{partitionStartDate}", partitionStartDate)
                     .replaceAll("\\$\\{partitionTimeInterval}", partitionTimeInterval);
-            jdbcTemplate.execute(script);
+            ownerJdbcTemplate.execute(script);
         }
     }
 }

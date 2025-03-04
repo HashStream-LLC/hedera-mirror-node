@@ -80,7 +80,6 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
         return domainBuilder
                 .entity()
                 .customize(e -> e.type(EntityType.ACCOUNT)
-                        .deleted(false)
                         .balance(1_000_000_000_000L)
                         .timestampRange(timestampRange)
                         .createdTimestamp(timestampRange.lowerEndpoint()))
@@ -108,8 +107,8 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
         return domainBuilder
                 .entity()
                 .customize(e -> e.type(EntityType.ACCOUNT)
-                        .deleted(false)
                         .evmAddress(null)
+                        .alias(null)
                         .balance(1_000_000_000_000L)
                         .timestampRange(timestampRange)
                         .createdTimestamp(timestampRange.lowerEndpoint()))
@@ -126,7 +125,6 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
                 .entity()
                 .customize(e -> e.type(EntityType.ACCOUNT)
                         .alias(alias.toByteArray())
-                        .deleted(false)
                         .evmAddress(evmAddress.toArray())
                         .balance(1_000_000_000_000L)
                         .createdTimestamp(timestampRange.lowerEndpoint())
@@ -134,10 +132,13 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
                 .persist();
     }
 
-    protected Entity accountWithBalancePersistHistorical(final long balance, final Range<Long> timestampRange) {
+    protected Entity accountEntityNoEvmAddressWithBalancePersistHistorical(
+            final long balance, final Range<Long> timestampRange) {
         final var entity = domainBuilder
                 .entity()
                 .customize(e -> e.balance(balance)
+                        .alias(null)
+                        .evmAddress(null)
                         .timestampRange(timestampRange)
                         .createdTimestamp(timestampRange.lowerEndpoint()))
                 .persist();
@@ -152,8 +153,9 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
         // result
         domainBuilder
                 .accountBalance()
-                .customize(ab -> ab.id(new AccountBalance.Id(timestampRange.lowerEndpoint(), EntityId.of(2)))
-                        .balance(balance))
+                .customize(
+                        ab -> ab.id(new AccountBalance.Id(timestampRange.lowerEndpoint(), treasuryEntity.toEntityId()))
+                                .balance(balance))
                 .persist();
         domainBuilder
                 .accountBalance()
@@ -168,8 +170,9 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
         // result
         domainBuilder
                 .accountBalance()
-                .customize(ab -> ab.id(new AccountBalance.Id(timestampRange.lowerEndpoint(), EntityId.of(2)))
-                        .balance(balance))
+                .customize(
+                        ab -> ab.id(new AccountBalance.Id(timestampRange.lowerEndpoint(), treasuryEntity.toEntityId()))
+                                .balance(balance))
                 .persist();
         domainBuilder
                 .tokenBalance()
@@ -207,6 +210,7 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
                 .tokenHistory()
                 .customize(t -> t.tokenId(tokenEntity.getId())
                         .type(TokenTypeEnum.NON_FUNGIBLE_UNIQUE)
+                        .kycStatus(TokenKycStatusEnum.GRANTED)
                         .timestampRange(timestampRange))
                 .persist();
         domainBuilder
@@ -297,7 +301,7 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
         if (TokenTypeEnum.FUNGIBLE_COMMON.equals(tokenType)) {
             return domainBuilder
                     .customFeeHistory()
-                    .customize(f -> f.tokenId(tokenEntity.getId())
+                    .customize(f -> f.entityId(tokenEntity.getId())
                             .fixedFees(List.of(fixedFee))
                             .fractionalFees(List.of(fractionalFee))
                             .royaltyFees(new ArrayList<>())
@@ -306,7 +310,7 @@ public abstract class AbstractContractCallServiceHistoricalTest extends Abstract
         } else {
             return domainBuilder
                     .customFeeHistory()
-                    .customize(f -> f.tokenId(tokenEntity.getId())
+                    .customize(f -> f.entityId(tokenEntity.getId())
                             .fixedFees(List.of(fixedFee))
                             .royaltyFees(List.of(royaltyFee))
                             .fractionalFees(new ArrayList<>())

@@ -162,6 +162,9 @@ public final class EntityIdUtils {
     }
 
     public static com.hedera.hapi.node.base.AccountID toAccountId(final Long id) {
+        if (id == null) {
+            return null;
+        }
         final var decodedEntityId = EntityId.of(id);
 
         return toAccountId(decodedEntityId);
@@ -189,6 +192,9 @@ public final class EntityIdUtils {
     }
 
     public static com.hedera.hapi.node.base.AccountID toAccountId(final EntityId entityId) {
+        if (entityId == null) {
+            return null;
+        }
         return com.hedera.hapi.node.base.AccountID.newBuilder()
                 .shardNum(entityId.getShard())
                 .realmNum(entityId.getRealm())
@@ -215,6 +221,12 @@ public final class EntityIdUtils {
                 .shardNum(entityId.getShard())
                 .realmNum(entityId.getRealm())
                 .tokenNum(entityId.getNum())
+                .build();
+    }
+
+    public static com.hedera.hapi.node.base.ContractID toContractID(final Address address) {
+        return com.hedera.hapi.node.base.ContractID.newBuilder()
+                .contractNum(numFromEvmAddress(address.toArrayUnsafe()))
                 .build();
     }
 
@@ -262,6 +274,10 @@ public final class EntityIdUtils {
 
     public static String asHexedEvmAddress(final Id id) {
         return CommonUtils.hex(asEvmAddress(id.num()));
+    }
+
+    public static String asHexedEvmAddress(long tokenId) {
+        return CommonUtils.hex(asEvmAddress(tokenId));
     }
 
     public static boolean isAlias(final AccountID idOrAlias) {

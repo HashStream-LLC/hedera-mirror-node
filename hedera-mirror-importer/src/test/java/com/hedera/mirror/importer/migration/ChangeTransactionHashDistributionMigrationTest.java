@@ -22,7 +22,6 @@ import com.hedera.mirror.common.domain.transaction.TransactionHash;
 import com.hedera.mirror.importer.DisableRepeatableSqlMigration;
 import com.hedera.mirror.importer.EnabledIfV2;
 import com.hedera.mirror.importer.ImporterIntegrationTest;
-import com.hedera.mirror.importer.config.Owner;
 import com.hedera.mirror.importer.repository.TransactionHashRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -33,15 +32,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.io.Resource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.util.StreamUtils;
 
+@DisablePartitionMaintenance
 @DisableRepeatableSqlMigration
 @EnabledIfV2
-@Import(DisablePartitionMaintenanceConfiguration.class)
 @RequiredArgsConstructor
 @Tag("migration")
 @TestPropertySource(properties = "spring.flyway.target=2.4.0")
@@ -53,7 +50,6 @@ class ChangeTransactionHashDistributionMigrationTest extends ImporterIntegration
             alter table transaction_hash drop column distribution_id;
             """;
 
-    private final @Owner JdbcTemplate jdbcTemplate;
     private final TransactionHashRepository transactionHashRepository;
 
     @Value("classpath:db/migration/v2/V2.4.1__change_transaction_hash_distribution.sql")
@@ -61,7 +57,7 @@ class ChangeTransactionHashDistributionMigrationTest extends ImporterIntegration
 
     @AfterEach
     void cleanup() {
-        jdbcTemplate.execute(REVERT_DDL);
+        ownerJdbcTemplate.execute(REVERT_DDL);
     }
 
     @Test
@@ -91,10 +87,10 @@ class ChangeTransactionHashDistributionMigrationTest extends ImporterIntegration
     }
 
     private void persistTransactionHashes(Collection<TransactionHash> transactionHashes) {
-        jdbcTemplate.batchUpdate(
+        ownerJdbcTemplate.batchUpdate(
                 """
-                insert into transaction_hash (consensus_timestamp, hash, payer_account_id) values (?, ?, ?)
-                """,
+                    insert into transaction_hash (consensus_timestamp, hash, payer_account_id) values (?, ?, ?)
+                    """,
                 transactionHashes,
                 transactionHashes.size(),
                 (ps, transactionHash) -> {
@@ -108,7 +104,7 @@ class ChangeTransactionHashDistributionMigrationTest extends ImporterIntegration
     private void runMigration() {
         try (var is = migrationSql.getInputStream()) {
             var script = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
-            jdbcTemplate.execute(script);
+            ownerJdbcTemplate.execute(script);
         }
     }
 }

@@ -17,6 +17,7 @@
 package com.hedera.mirror.importer.parser.record.transactionhandler;
 
 import static com.hedera.mirror.common.util.DomainUtils.toBytes;
+import static com.hedera.mirror.importer.util.Utility.DEFAULT_RUNNING_HASH_VERSION;
 
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hedera.mirror.common.domain.topic.TopicMessage;
@@ -69,9 +70,14 @@ class ConsensusSubmitMessageTransactionHandler extends AbstractTransactionHandle
         var transactionBody = recordItem.getTransactionBody().getConsensusSubmitMessage();
         var transactionRecord = recordItem.getTransactionRecord();
         var receipt = transactionRecord.getReceipt();
-        int runningHashVersion =
-                receipt.getTopicRunningHashVersion() == 0 ? 1 : (int) receipt.getTopicRunningHashVersion();
         var topicMessage = new TopicMessage();
+
+        // Only persist the value if it is not the default
+        if (receipt.getTopicRunningHashVersion() != DEFAULT_RUNNING_HASH_VERSION) {
+            var runningHashVersion =
+                    receipt.getTopicRunningHashVersion() == 0 ? 1 : (int) receipt.getTopicRunningHashVersion();
+            topicMessage.setRunningHashVersion(runningHashVersion);
+        }
 
         // Handle optional fragmented topic message
         if (transactionBody.hasChunkInfo()) {
@@ -89,7 +95,6 @@ class ConsensusSubmitMessageTransactionHandler extends AbstractTransactionHandle
         topicMessage.setMessage(toBytes(transactionBody.getMessage()));
         topicMessage.setPayerAccountId(recordItem.getPayerAccountId());
         topicMessage.setRunningHash(toBytes(receipt.getTopicRunningHash()));
-        topicMessage.setRunningHashVersion(runningHashVersion);
         topicMessage.setSequenceNumber(receipt.getTopicSequenceNumber());
         topicMessage.setTopicId(transaction.getEntityId());
         entityListener.onTopicMessage(topicMessage);

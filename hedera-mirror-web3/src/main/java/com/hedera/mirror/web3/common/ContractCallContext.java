@@ -16,9 +16,6 @@
 
 package com.hedera.mirror.web3.common;
 
-import com.hedera.hapi.node.contract.ContractCreateTransactionBody;
-import com.hedera.hapi.node.file.FileCreateTransactionBody;
-import com.hedera.hapi.node.state.file.File;
 import com.hedera.mirror.common.domain.contract.ContractAction;
 import com.hedera.mirror.common.domain.transaction.RecordFile;
 import com.hedera.mirror.web3.evm.contracts.execution.traceability.Opcode;
@@ -26,12 +23,16 @@ import com.hedera.mirror.web3.evm.contracts.execution.traceability.OpcodeTracer;
 import com.hedera.mirror.web3.evm.contracts.execution.traceability.OpcodeTracerOptions;
 import com.hedera.mirror.web3.evm.store.CachingStateFrame;
 import com.hedera.mirror.web3.evm.store.StackedStateFrames;
-import com.hedera.mirror.web3.state.FileReadableKVState;
+import com.hedera.mirror.web3.service.model.CallServiceParameters;
+import com.hedera.mirror.web3.viewmodel.BlockType;
 import java.util.ArrayList;
 import java.util.EmptyStackException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -57,6 +58,10 @@ public class ContractCallContext {
 
     @Setter
     private List<Opcode> opcodes = new ArrayList<>();
+
+    @Setter
+    private CallServiceParameters callServiceParameters;
+
     /**
      * Record file which stores the block timestamp and other historical block details used for filtering of historical
      * data.
@@ -70,25 +75,17 @@ public class ContractCallContext {
     /** Fixed "base" of stack: a R/O cache frame on top of the DB-backed cache frame */
     private CachingStateFrame<Object> stackBase;
 
+    @Getter(AccessLevel.NONE)
+    private Map<String, Map<Object, Object>> readCache = new HashMap<>();
+
+    @Getter(AccessLevel.NONE)
+    private Map<String, Map<Object, Object>> writeCache = new HashMap<>();
+
     /**
      * The timestamp used to fetch the state from the stackedStateFrames.
      */
     @Setter
     private Optional<Long> timestamp = Optional.empty();
-
-    /**
-     * The TransactionExecutor from the modularized services integration deploys contracts in 2 steps:
-     * <p>
-     * 1. The initcode is uploaded and saved as a file using a {@link FileCreateTransactionBody}. 2. The returned file
-     * id from step 1 is then passed to a {@link ContractCreateTransactionBody}. Each step performs a separate
-     * transaction. For step 2 even if we pass the correct file id, since the mirror node data is readonly, the
-     * {@link FileReadableKVState} is not able to populate the contract's bytecode from the DB since it was never
-     * explicitly persisted in the DB.
-     * <p>
-     * This is the function of the field "file" to hold temporary the bytecode and the fileId during contract deploy.
-     */
-    @Setter
-    private Optional<File> file = Optional.empty();
 
     private ContractCallContext() {}
 
@@ -101,9 +98,8 @@ public class ContractCallContext {
     }
 
     public void reset() {
-        recordFile = null;
         stack = stackBase;
-        file = Optional.empty();
+        writeCache.clear();
     }
 
     public int getStackHeight() {
@@ -139,18 +135,41 @@ public class ContractCallContext {
      */
     public void initializeStackFrames(final StackedStateFrames stackedStateFrames) {
         if (stackedStateFrames != null) {
-            final var stateTimestamp = timestamp.isPresent()
-                    ? timestamp
-                    : Optional.ofNullable(recordFile).map(RecordFile::getConsensusEnd);
+            final var stateTimestamp = getTimestampOrDefaultFromRecordFile();
             stackBase = stack = stackedStateFrames.getInitializedStackBase(stateTimestamp);
         }
     }
 
     public boolean useHistorical() {
-        return recordFile != null;
+        if (callServiceParameters != null) {
+            return callServiceParameters.getBlock() != BlockType.LATEST;
+        }
+        return recordFile != null; // Remove recordFile comparison after mono code deletion
     }
 
     public void incrementContractActionsCounter() {
         this.contractActionIndexOfCurrentFrame++;
+    }
+
+    /**
+     * Returns the set timestamp or the consensus end timestamp from the set record file only if we are in a historical context. If not - an empty optional is returned.
+     * */
+    public Optional<Long> getTimestamp() {
+        if (useHistorical()) {
+            return getTimestampOrDefaultFromRecordFile();
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Long> getTimestampOrDefaultFromRecordFile() {
+        return timestamp.or(() -> Optional.ofNullable(recordFile).map(RecordFile::getConsensusEnd));
+    }
+
+    public Map<Object, Object> getReadCacheState(final String stateKey) {
+        return readCache.computeIfAbsent(stateKey, k -> new HashMap<>());
+    }
+
+    public Map<Object, Object> getWriteCacheState(final String stateKey) {
+        return writeCache.computeIfAbsent(stateKey, k -> new HashMap<>());
     }
 }

@@ -18,6 +18,7 @@ package com.hedera.mirror.importer;
 
 import com.hedera.mirror.importer.migration.MigrationProperties;
 import com.hedera.mirror.importer.util.Utility;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -60,6 +61,7 @@ public class ImporterProperties {
     private Path initialAddressBook;
 
     @NotNull
+    @Valid
     private Map<String, MigrationProperties> migration = new CaseInsensitiveMap<>();
 
     @NotBlank
@@ -72,6 +74,7 @@ public class ImporterProperties {
 
     private Instant startDate;
 
+    @Min(0)
     private Long startBlockNumber;
 
     private Long topicRunningHashV2AddedTimestamp;

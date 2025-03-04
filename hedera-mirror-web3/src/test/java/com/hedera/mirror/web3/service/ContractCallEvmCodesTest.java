@@ -51,7 +51,7 @@ import org.bouncycastle.util.encoders.Hex;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.AbiTypes;
@@ -65,7 +65,7 @@ class ContractCallEvmCodesTest extends AbstractContractCallServiceTest {
 
     private final MirrorNodeEvmProperties mirrorNodeEvmProperties;
 
-    @SpyBean
+    @MockitoSpyBean
     private ContractExecutionService contractExecutionService;
 
     @Test
@@ -166,32 +166,34 @@ class ContractCallEvmCodesTest extends AbstractContractCallServiceTest {
     @Test
     void getBlockHashReturnsCorrectHash() throws Exception {
         testWeb3jService.setUseContractCallDeploy(true);
-        domainBuilder.recordFile().persist(); // Set a latest block - needed for the block hash operation
+        domainBuilder.recordFile().customize(r -> r.index(1L)).persist();
+        var latest = domainBuilder.recordFile().customize(r -> r.index(2L)).persist();
         final var contract = testWeb3jService.deploy(EvmCodes::deploy);
-        var result = contract.call_getBlockHash(BigInteger.valueOf(genesisRecordFile.getIndex()))
+        var result = contract.call_getBlockHash(BigInteger.valueOf(latest.getIndex()))
                 .send();
-        var expectedResult =
-                ByteString.fromHex(genesisRecordFile.getHash().substring(0, 64)).toByteArray();
+        var expectedResult = Hex.decode(latest.getHash().substring(0, 64));
         assertThat(result).isEqualTo(expectedResult);
     }
 
     @Test
     void getGenesisBlockHashReturnsCorrectBlock() throws Exception {
         testWeb3jService.setUseContractCallDeploy(true);
-        domainBuilder.recordFile().persist(); // Set a latest block - needed for the block hash operation
+        domainBuilder.recordFile().customize(r -> r.index(1L)).persist();
+        domainBuilder.recordFile().customize(r -> r.index(2L)).persist();
+
         final var contract = testWeb3jService.deploy(EvmCodes::deploy);
         var result = contract.call_getBlockHash(BigInteger.ZERO).send();
-        var expectedResult =
-                ByteString.fromHex(genesisRecordFile.getHash().substring(0, 64)).toByteArray();
+
+        var expectedResult = Hex.decode(genesisRecordFile.getHash().substring(0, 64));
         assertThat(result).isEqualTo(expectedResult);
     }
 
     @Test
     void getLatestBlockHashIsNotEmpty() throws Exception {
-        domainBuilder.recordFile().persist();
+        domainBuilder.recordFile().customize(r -> r.index(1L)).persist();
         final var contract = testWeb3jService.deploy(EvmCodes::deploy);
         var result = contract.call_getLatestBlockHash().send();
-        var expectedResult = ByteString.fromHex((EMPTY_BLOCK_HASH)).toByteArray();
+        var expectedResult = Hex.decode(EMPTY_BLOCK_HASH);
         assertThat(result).isNotEqualTo(expectedResult);
     }
 
@@ -200,7 +202,7 @@ class ContractCallEvmCodesTest extends AbstractContractCallServiceTest {
         final var contract = testWeb3jService.deploy(EvmCodes::deploy);
         var result =
                 contract.call_getBlockHash(BigInteger.valueOf(Long.MAX_VALUE)).send();
-        var expectedResult = ByteString.fromHex((EMPTY_BLOCK_HASH)).toByteArray();
+        var expectedResult = Hex.decode(EMPTY_BLOCK_HASH);
         assertThat(result).isEqualTo(expectedResult);
     }
 

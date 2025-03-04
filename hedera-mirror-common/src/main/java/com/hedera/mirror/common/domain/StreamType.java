@@ -18,6 +18,7 @@ package com.hedera.mirror.common.domain;
 
 import com.google.common.collect.ImmutableSortedSet;
 import com.hedera.mirror.common.domain.balance.AccountBalanceFile;
+import com.hedera.mirror.common.domain.transaction.BlockFile;
 import com.hedera.mirror.common.domain.transaction.RecordFile;
 import java.time.Duration;
 import java.util.Comparator;
@@ -38,12 +39,10 @@ public enum StreamType {
             "_Balances",
             List.of("csv", "pb"),
             Duration.ofMinutes(15L)),
-    RECORD(RecordFile::new, "recordstreams", "record", "", List.of("rcd"), Duration.ofSeconds(2L));
+    RECORD(RecordFile::new, "recordstreams", "record", "", List.of("rcd"), Duration.ofSeconds(2L)),
+    BLOCK(BlockFile::new, "", "", "", List.of("blk"), Duration.ofMillis(500L));
 
     public static final String SIGNATURE_SUFFIX = "_sig";
-
-    private static final String PARSED = "parsed";
-    private static final String SIGNATURES = "signatures";
 
     private final SortedSet<Extension> dataExtensions;
     private final String nodePrefix;
@@ -74,14 +73,6 @@ public enum StreamType {
         signatureExtensions = dataExtensions.stream()
                 .map(ext -> Extension.of(ext.getName() + SIGNATURE_SUFFIX, ext.getPriority()))
                 .collect(ImmutableSortedSet.toImmutableSortedSet(Comparator.naturalOrder()));
-    }
-
-    public String getParsed() {
-        return PARSED;
-    }
-
-    public String getSignatures() {
-        return SIGNATURES;
     }
 
     public boolean isChained() {

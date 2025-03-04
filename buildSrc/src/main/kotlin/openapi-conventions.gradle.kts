@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-import org.gradle.api.tasks.compile.JavaCompile
-import org.gradle.kotlin.dsl.withType
-
 plugins {
     id("java-conventions")
     id("org.openapi.generator")
@@ -31,7 +28,7 @@ openApiGenerate {
             "developerEmail" to "mirrornode@hedera.com",
             "developerName" to "Hedera Mirror Node Team",
             "developerOrganization" to "Hedera Hashgraph",
-            "developerOrganizationUrl" to "https://github.com/hashgraph/hedera-mirror-node",
+            "developerOrganizationUrl" to "https://github.com/hiero-ledger/hiero-mirror-node",
             "interfaceOnly" to "true",
             "licenseName" to "Apache License 2.0",
             "licenseUrl" to "https://www.apache.org/licenses/LICENSE-2.0.txt",
@@ -40,7 +37,7 @@ openApiGenerate {
             "sourceFolder" to "",
             "supportUrlQuery" to "false",
             "useBeanValidation" to "true",
-            "useJakartaEe" to "true"
+            "useJakartaEe" to "true",
         )
     generateApiTests = false
     generateModelTests = false
@@ -58,6 +55,6 @@ openApiGenerate {
     typeMappings = mapOf("Timestamp" to "String", "string+binary" to "String")
 }
 
-tasks.withType<JavaCompile> { dependsOn("openApiGenerate") }
+tasks.withType<JavaCompile>().configureEach { dependsOn("openApiGenerate") }
 
 java.sourceSets["main"].java { srcDir(openApiGenerate.outputDir) }

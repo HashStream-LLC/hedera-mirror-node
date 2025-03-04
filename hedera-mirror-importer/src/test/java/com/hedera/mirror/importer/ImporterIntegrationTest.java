@@ -16,62 +16,74 @@
 
 package com.hedera.mirror.importer;
 
+import static com.hedera.mirror.importer.TestUtils.getResource;
+
 import com.google.common.base.CaseFormat;
 import com.google.common.collect.Range;
 import com.hedera.mirror.common.config.CommonIntegrationTest;
+import com.hedera.mirror.common.config.RedisTestConfiguration;
 import com.hedera.mirror.common.converter.EntityIdConverter;
 import com.hedera.mirror.common.domain.entity.EntityId;
-import com.hedera.mirror.importer.ImporterIntegrationTest.Configuration;
 import com.hedera.mirror.importer.config.DateRangeCalculator;
+import com.hedera.mirror.importer.config.Owner;
 import com.hedera.mirror.importer.converter.JsonbToListConverter;
 import com.hedera.mirror.importer.parser.record.entity.ParserContext;
-import com.redis.testcontainers.RedisContainer;
 import io.hypersistence.utils.hibernate.type.range.guava.PostgreSQLGuavaRangeType;
 import jakarta.annotation.Resource;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
+import lombok.SneakyThrows;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.assertj.core.api.SoftAssertions;
 import org.assertj.core.api.junit.jupiter.InjectSoftAssertions;
 import org.assertj.core.api.junit.jupiter.SoftAssertionsExtension;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.postgresql.jdbc.PgArray;
 import org.postgresql.util.PGobject;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.jdbc.core.DataClassRowMapper;
 import org.springframework.jdbc.core.JdbcOperations;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.utility.DockerImageName;
 
 @ExtendWith(SoftAssertionsExtension.class)
-@Import(Configuration.class)
+@Import(RedisTestConfiguration.class)
 public abstract class ImporterIntegrationTest extends CommonIntegrationTest {
 
     private static final Map<Class<?>, String> DEFAULT_DOMAIN_CLASS_IDS = new ConcurrentHashMap<>();
 
     @Resource
+    protected Flyway flyway;
+
+    @Resource
     protected JdbcOperations jdbcOperations;
+
+    @Owner
+    @Resource
+    protected JdbcTemplate ownerJdbcTemplate;
 
     @Resource
     protected ParserContext parserContext;
@@ -91,6 +103,15 @@ public abstract class ImporterIntegrationTest extends CommonIntegrationTest {
     @Getter
     @Value("#{environment.matchesProfiles('!v2')}")
     private boolean v1;
+
+    @BeforeEach
+    void runRequiredRepeatableMigrations() {
+        new RequiredRepeatableMigrationExecutor().run();
+    }
+
+    protected List<String> getRequiredRepeatableMigrations() {
+        return Collections.emptyList();
+    }
 
     protected static <T> RowMapper<T> rowMapper(Class<T> entityClass) {
         DefaultConversionService defaultConversionService = new DefaultConversionService();
@@ -170,15 +191,35 @@ public abstract class ImporterIntegrationTest extends CommonIntegrationTest {
         return !idColumns.isEmpty() ? idColumns : "id";
     }
 
-    @TestConfiguration(proxyBeanMethods = false)
-    static class Configuration {
+    private class RequiredRepeatableMigrationExecutor {
 
-        @Bean
-        @ServiceConnection("redis")
-        RedisContainer redis() {
-            var logger = LoggerFactory.getLogger(RedisContainer.class);
-            return new RedisContainer(DockerImageName.parse(REDIS_IMAGE))
-                    .withLogConsumer(new Slf4jLogConsumer(logger, true));
+        private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{(.*)}");
+
+        @SneakyThrows
+        void run() {
+            for (var migration : getRequiredRepeatableMigrations()) {
+                String sql = render(FileUtils.readFileToString(getResource(migration), StandardCharsets.UTF_8));
+                ownerJdbcTemplate.execute(sql);
+            }
+        }
+
+        private String render(String sql) {
+            var matcher = PLACEHOLDER_PATTERN.matcher(sql);
+            var placeHolderKeys = new HashSet<String>();
+            while (matcher.find()) {
+                placeHolderKeys.add(matcher.group(1));
+            }
+
+            if (placeHolderKeys.isEmpty()) {
+                return sql;
+            }
+
+            var placeHolders = flyway.getConfiguration().getPlaceholders();
+            for (String key : placeHolderKeys) {
+                sql = sql.replaceAll("\\$\\{" + key + "}", placeHolders.get(key));
+            }
+
+            return sql;
         }
     }
 }
