@@ -24,3 +24,8 @@ env $(cat ./hedera-mirror-importer/local-testing/localstack.env
 | xargs) \                                               
   aws sqs receive-message --queue-url http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/notification-queue --endpoint-url http://localhost:4566
 ```
+
+## Running the HashStream unit tests
+The unit tests for HashStream are isolated to a specific Java package. Run this command to run only
+those tests and skip 'scanning'...whatever that does in normal Hedera testing:
+`./gradlew :importer:test --tests 'com.hedera.mirror.importer.parser.record.contractcallnotifications.*' --no-scan`
