@@ -80,6 +80,8 @@ import com.hedera.mirror.common.domain.token.TokenPauseStatusEnum;
 import com.hedera.mirror.common.domain.token.TokenSupplyTypeEnum;
 import com.hedera.mirror.common.domain.token.TokenTransfer;
 import com.hedera.mirror.common.domain.token.TokenTypeEnum;
+import com.hedera.mirror.common.domain.topic.Topic;
+import com.hedera.mirror.common.domain.topic.TopicHistory;
 import com.hedera.mirror.common.domain.topic.TopicMessage;
 import com.hedera.mirror.common.domain.topic.TopicMessageLookup;
 import com.hedera.mirror.common.domain.transaction.AssessedCustomFee;
@@ -405,7 +407,7 @@ public class DomainBuilder {
                 .fractionalFees(List.of(fractionalFee()))
                 .royaltyFees(List.of(royaltyFee()))
                 .timestampRange(Range.atLeast(timestamp()))
-                .tokenId(entityId().getId());
+                .entityId(entityId().getId());
         return new DomainWrapperImpl<>(builder, builder::build);
     }
 
@@ -416,7 +418,7 @@ public class DomainBuilder {
                 .fractionalFees(List.of(fractionalFee()))
                 .royaltyFees(List.of(royaltyFee()))
                 .timestampRange(Range.closedOpen(timestamp, timestamp + 10))
-                .tokenId(entityId().getId());
+                .entityId(entityId().getId());
         return new DomainWrapperImpl<>(builder, builder::build);
     }
 
@@ -446,7 +448,6 @@ public class DomainBuilder {
                 .shard(0L)
                 .stakedNodeId(-1L)
                 .stakePeriodStart(-1L)
-                .submitKey(key())
                 .timestampRange(Range.atLeast(createdTimestamp))
                 .type(ACCOUNT);
 
@@ -486,7 +487,6 @@ public class DomainBuilder {
                 .shard(0L)
                 .stakedNodeId(-1L)
                 .stakePeriodStart(-1L)
-                .submitKey(key())
                 .timestampRange(Range.closedOpen(timestamp, timestamp + 10))
                 .type(ACCOUNT);
 
@@ -763,6 +763,8 @@ public class DomainBuilder {
         long timestamp = timestamp();
         long consensusEnd = timestamp + 1;
         var instantString = now.toString().replace(':', '_');
+        var blockNumber = number();
+        var round = blockNumber + 1;
         var builder = RecordFile.builder()
                 .bytes(bytes(128))
                 .consensusStart(timestamp)
@@ -775,18 +777,23 @@ public class DomainBuilder {
                 .hapiVersionMinor(28)
                 .hapiVersionPatch(0)
                 .hash(hash(96))
-                .index(number())
+                .index(blockNumber)
                 .logsBloom(bloomFilter())
                 .loadEnd(now.toEpochMilli() + 1000L)
                 .loadStart(now.toEpochMilli())
                 .name(instantString + ".rcd.gz")
                 .nodeId(number())
                 .previousHash(hash(96))
+                .roundEnd(round)
+                .roundStart(round)
                 .sidecarCount(1)
                 .sidecars(List.of(sidecarFile()
                         .customize(s -> s.consensusEnd(consensusEnd).name(instantString + "_01.rcd.gz"))
                         .get()))
                 .size(256 * 1024)
+                .softwareVersionMajor(0)
+                .softwareVersionMinor(28)
+                .softwareVersionPatch(0)
                 .version(6);
         return new DomainWrapperImpl<>(builder, builder::build);
     }
@@ -1010,22 +1017,50 @@ public class DomainBuilder {
         return new DomainWrapperImpl<>(builder, builder::build);
     }
 
-    public DomainWrapper<Entity, Entity.EntityBuilder<?, ?>> topic() {
+    public DomainWrapper<Topic, Topic.TopicBuilder<?, ?>> topic() {
+        long timestamp = timestamp();
+        var builder = Topic.builder()
+                .adminKey(bytes(32))
+                .createdTimestamp(timestamp)
+                .id(id())
+                .feeExemptKeyList(bytes(32))
+                .feeScheduleKey(bytes(32))
+                .submitKey(bytes(32))
+                .timestampRange(Range.atLeast(timestamp));
+        return new DomainWrapperImpl<>(builder, builder::build);
+    }
+
+    public DomainWrapper<TopicHistory, TopicHistory.TopicHistoryBuilder<?, ?>> topicHistory() {
+        long timestamp = timestamp();
+        var builder = TopicHistory.builder()
+                .adminKey(bytes(32))
+                .createdTimestamp(timestamp)
+                .id(id())
+                .feeExemptKeyList(bytes(32))
+                .feeScheduleKey(bytes(32))
+                .submitKey(bytes(32))
+                .timestampRange(Range.closedOpen(timestamp, timestamp + 100));
+        return new DomainWrapperImpl<>(builder, builder::build);
+    }
+
+    public DomainWrapper<Entity, Entity.EntityBuilder<?, ?>> topicEntity() {
         return entity().customize(e -> e.alias(null)
                 .balance(null)
                 .balanceTimestamp(null)
                 .receiverSigRequired(null)
                 .ethereumNonce(null)
                 .evmAddress(null)
+                .key(null)
                 .maxAutomaticTokenAssociations(null)
                 .proxyAccountId(null)
+                .publicKey(null)
                 .type(TOPIC));
     }
 
     public DomainWrapper<TopicMessage, TopicMessage.TopicMessageBuilder> topicMessage() {
         var transactionId = TransactionID.newBuilder()
                 .setAccountID(AccountID.newBuilder().setAccountNum(id()))
-                .setTransactionValidStart(Timestamp.newBuilder().setSeconds(timestamp()))
+                .setTransactionValidStart(protoTimestamp())
                 .build()
                 .toByteArray();
         var builder = TopicMessage.builder()
@@ -1066,6 +1101,7 @@ public class DomainBuilder {
                         .entityId(entityId())
                         .isApproval(false)
                         .build()))
+                .maxCustomFees(new byte[][] {bytes(6), bytes(8)})
                 .maxFee(100000000L)
                 .memo(bytes(10))
                 .nodeAccountId(entityId())
@@ -1180,11 +1216,11 @@ public class DomainBuilder {
     }
 
     public String text(int characters) {
-        return RandomStringUtils.randomAlphanumeric(characters);
+        return RandomStringUtils.secure().nextAlphanumeric(characters);
     }
 
     public String hash(int characters) {
-        return RandomStringUtils.random(characters, "0123456789abcdef");
+        return RandomStringUtils.secure().next(characters, "0123456789abcdef");
     }
 
     /**
@@ -1194,6 +1230,14 @@ public class DomainBuilder {
      */
     public void resetTimestamp(long value) {
         timestampOffset = value - timestampNoOffset();
+    }
+
+    public Timestamp protoTimestamp() {
+        long timestamp = timestamp();
+        return Timestamp.newBuilder()
+                .setSeconds(timestamp / DomainUtils.NANOS_PER_SECOND)
+                .setNanos((int) (timestamp % DomainUtils.NANOS_PER_SECOND))
+                .build();
     }
 
     public long timestamp() {

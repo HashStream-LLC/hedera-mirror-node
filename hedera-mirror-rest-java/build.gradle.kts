@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-description = "Hedera Mirror Node Rest Java"
+description = "Hedera Mirror Node REST Java"
 
 plugins {
     id("openapi-conventions")
@@ -44,6 +44,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.compileJava {
@@ -51,7 +52,7 @@ tasks.compileJava {
         listOf(
             "-Amapstruct.defaultComponentModel=jakarta",
             "-Amapstruct.defaultInjectionStrategy=constructor",
-            "-Amapstruct.disableBuilders=true"
+            "-Amapstruct.disableBuilders=true",
         )
     )
 }

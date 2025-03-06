@@ -16,115 +16,95 @@
 
 package com.hedera.mirror.web3.service;
 
+import static com.hedera.mirror.web3.convert.BytesDecoder.maybeDecodeSolidityErrorStringToReadableMessage;
 import static com.hedera.mirror.web3.state.Utils.isMirror;
+import static com.hedera.mirror.web3.validation.HexValidator.HEX_PREFIX;
 
 import com.hedera.hapi.node.base.AccountID;
 import com.hedera.hapi.node.base.ContractID;
 import com.hedera.hapi.node.base.Duration;
-import com.hedera.hapi.node.base.FileID;
-import com.hedera.hapi.node.base.ResponseCodeEnum;
 import com.hedera.hapi.node.base.Timestamp;
 import com.hedera.hapi.node.base.TransactionID;
 import com.hedera.hapi.node.contract.ContractCallTransactionBody;
 import com.hedera.hapi.node.contract.ContractCreateTransactionBody;
 import com.hedera.hapi.node.contract.ContractFunctionResult;
-import com.hedera.hapi.node.file.FileCreateTransactionBody;
-import com.hedera.hapi.node.state.file.File;
 import com.hedera.hapi.node.state.primitives.ProtoBytes;
 import com.hedera.hapi.node.transaction.TransactionBody;
 import com.hedera.hapi.node.transaction.TransactionRecord;
 import com.hedera.mirror.web3.common.ContractCallContext;
+import com.hedera.mirror.web3.evm.contracts.execution.traceability.MirrorOperationTracer;
 import com.hedera.mirror.web3.evm.contracts.execution.traceability.OpcodeTracer;
 import com.hedera.mirror.web3.evm.properties.MirrorNodeEvmProperties;
+import com.hedera.mirror.web3.exception.MirrorEvmTransactionException;
 import com.hedera.mirror.web3.service.model.CallServiceParameters;
-import com.hedera.mirror.web3.state.AliasesReadableKVState;
-import com.hedera.node.app.config.ConfigProviderImpl;
+import com.hedera.mirror.web3.service.model.CallServiceParameters.CallType;
+import com.hedera.mirror.web3.state.keyvalue.AliasesReadableKVState;
 import com.hedera.node.app.service.evm.contracts.execution.HederaEvmTransactionProcessingResult;
 import com.hedera.node.app.service.token.TokenService;
-import com.hedera.node.app.workflows.standalone.TransactionExecutor;
-import com.hedera.node.app.workflows.standalone.TransactionExecutors;
-import com.hedera.node.app.workflows.standalone.TransactionExecutors.TracerBinding;
 import com.hedera.node.config.data.EntitiesConfig;
-import com.swirlds.config.api.Configuration;
 import com.swirlds.state.State;
-import jakarta.annotation.Nullable;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Meter.MeterProvider;
 import jakarta.inject.Named;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import lombok.CustomLog;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.tuweni.bytes.Bytes;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.evm.tracing.OperationTracer;
 
 @Named
 @CustomLog
+@RequiredArgsConstructor
 public class TransactionExecutionService {
 
-    private static final Configuration DEFAULT_CONFIG = new ConfigProviderImpl().getConfiguration();
-    private static final OperationTracer[] EMPTY_OPERATION_TRACER_ARRAY = new OperationTracer[0];
     private static final AccountID TREASURY_ACCOUNT_ID =
             AccountID.newBuilder().accountNum(2).build();
     private static final Duration TRANSACTION_DURATION = new Duration(15);
-    private static final Timestamp TRANSACTION_START = new Timestamp(0, 0);
-    private static final int INITCODE_SIZE_KB = 6 * 1024;
+    private static final long CONTRACT_CREATE_TX_FEE = 100_000_000L;
+
     private final State mirrorNodeState;
     private final MirrorNodeEvmProperties mirrorNodeEvmProperties;
     private final OpcodeTracer opcodeTracer;
+    private final MirrorOperationTracer mirrorOperationTracer;
+    private final TransactionExecutorFactory transactionExecutorFactory;
 
-    protected TransactionExecutionService(
-            State mirrorNodeState, MirrorNodeEvmProperties mirrorNodeEvmProperties, OpcodeTracer opcodeTracer) {
-        this.mirrorNodeState = mirrorNodeState;
-        this.mirrorNodeEvmProperties = mirrorNodeEvmProperties;
-        this.opcodeTracer = opcodeTracer;
-    }
-
-    public HederaEvmTransactionProcessingResult execute(final CallServiceParameters params, final long estimatedGas) {
+    public HederaEvmTransactionProcessingResult execute(
+            final CallServiceParameters params, final long estimatedGas, final MeterProvider<Counter> gasUsedCounter) {
         final var isContractCreate = params.getReceiver().isZero();
+        final var configuration = mirrorNodeEvmProperties.getVersionedConfiguration();
         final var maxLifetime =
-                DEFAULT_CONFIG.getConfigData(EntitiesConfig.class).maxLifetime();
-        var executor =
-                ExecutorFactory.newExecutor(mirrorNodeState, mirrorNodeEvmProperties.getTransactionProperties(), null);
+                configuration.getConfigData(EntitiesConfig.class).maxLifetime();
+        var executor = transactionExecutorFactory.get();
 
         TransactionBody transactionBody;
-        HederaEvmTransactionProcessingResult result;
+        HederaEvmTransactionProcessingResult result = null;
         if (isContractCreate) {
-            if (params.getCallData().size() < INITCODE_SIZE_KB) {
-                transactionBody = buildContractCreateTransactionBodyWithInitBytecode(params, estimatedGas, maxLifetime);
-            } else {
-                // Upload the init bytecode
-                transactionBody = buildFileCreateTransactionBody(params, maxLifetime);
-                var uploadReceipt = executor.execute(transactionBody, Instant.EPOCH);
-                final var fileID = uploadReceipt
-                        .getFirst()
-                        .transactionRecord()
-                        .receiptOrThrow()
-                        .fileIDOrThrow();
-                final var file = File.newBuilder()
-                        .fileId(fileID)
-                        .contents(com.hedera.pbj.runtime.io.buffer.Bytes.wrap(
-                                params.getCallData().toFastHex(false).getBytes()))
-                        .build();
-                // Set the context variables for the uploaded contract.
-                ContractCallContext.get().setFile(Optional.of(file));
-
-                // Create the contract with the init bytecode
-                transactionBody =
-                        buildContractCreateTransactionBodyWithFileID(params, fileID, estimatedGas, maxLifetime);
-            }
+            transactionBody = buildContractCreateTransactionBody(params, estimatedGas, maxLifetime);
         } else {
             transactionBody = buildContractCallTransactionBody(params, estimatedGas);
         }
 
-        var receipt = executor.execute(transactionBody, Instant.EPOCH, getOperationTracers());
+        var receipt = executor.execute(transactionBody, Instant.now(), getOperationTracers());
         var transactionRecord = receipt.getFirst().transactionRecord();
-        if (transactionRecord.receiptOrThrow().status() == ResponseCodeEnum.SUCCESS) {
+        if (transactionRecord.receiptOrThrow().status() == com.hedera.hapi.node.base.ResponseCodeEnum.SUCCESS) {
             result = buildSuccessResult(isContractCreate, transactionRecord, params);
         } else {
-            result = buildFailedResult(transactionRecord, isContractCreate);
+            result = handleFailedResult(transactionRecord, isContractCreate, gasUsedCounter);
         }
         return result;
+    }
+
+    // Duplicated code as in ContractCallService class - it will be removed from there when switch to the modularized
+    // implementation entirely.
+    private void updateErrorGasUsedMetric(
+            final MeterProvider<Counter> gasUsedCounter, final long gasUsed, final int iterations) {
+        gasUsedCounter
+                .withTags("type", CallType.ERROR.toString(), "iteration", String.valueOf(iterations))
+                .increment(gasUsed);
     }
 
     private ContractFunctionResult getTransactionResult(
@@ -149,40 +129,56 @@ public class TransactionExecutionService {
                 params.getReceiver());
     }
 
-    private HederaEvmTransactionProcessingResult buildFailedResult(
-            final TransactionRecord transactionRecord, final boolean isContractCreate) {
-        var result = getTransactionResult(transactionRecord, isContractCreate);
-        var status = transactionRecord.receipt().status();
+    private HederaEvmTransactionProcessingResult handleFailedResult(
+            final TransactionRecord transactionRecord,
+            final boolean isContractCreate,
+            final MeterProvider<Counter> gasUsedCounter)
+            throws MirrorEvmTransactionException {
+        var result =
+                isContractCreate ? transactionRecord.contractCreateResult() : transactionRecord.contractCallResult();
+        var status = transactionRecord.receiptOrThrow().status();
+        if (result == null) {
+            // No result - the call did not reach the EVM and probably failed at pre-checks. No metric to update in this
+            // case.
+            throw new MirrorEvmTransactionException(status.protoName(), StringUtils.EMPTY, StringUtils.EMPTY);
+        } else {
+            var errorMessage = getErrorMessage(result).orElse(Bytes.EMPTY);
+            var detail = maybeDecodeSolidityErrorStringToReadableMessage(errorMessage);
+            updateErrorGasUsedMetric(gasUsedCounter, result.gasUsed(), 1);
+            if (ContractCallContext.get().getOpcodeTracerOptions() == null) {
+                throw new MirrorEvmTransactionException(
+                        status.protoName(),
+                        detail,
+                        errorMessage.toHexString(),
+                        HederaEvmTransactionProcessingResult.failed(
+                                result.gasUsed(), 0L, 0L, Optional.of(errorMessage), Optional.empty()));
+            } else {
+                // If we are in an opcode trace scenario, we need to return a failed result in order to get the
+                // opcode list from the ContractCallContext. If we throw an exception instead of returning a result,
+                // as in the regular case, we won't be able to get the opcode list.
+                return HederaEvmTransactionProcessingResult.failed(
+                        result.gasUsed(), 0L, 0L, Optional.of(errorMessage), Optional.empty());
+            }
+        }
+    }
 
-        return HederaEvmTransactionProcessingResult.failed(
-                result.gasUsed(),
-                0L,
-                0L,
-                Optional.of(Bytes.wrap(status.protoName().getBytes())),
-                Optional.empty());
+    private Optional<Bytes> getErrorMessage(final ContractFunctionResult result) {
+        return result.errorMessage().startsWith(HEX_PREFIX)
+                ? Optional.of(Bytes.fromHexString(result.errorMessage()))
+                : Optional.empty(); // If it doesn't start with 0x, the message is already decoded and readable.
     }
 
     private TransactionBody.Builder defaultTransactionBodyBuilder(final CallServiceParameters params) {
         return TransactionBody.newBuilder()
                 .transactionID(TransactionID.newBuilder()
-                        .transactionValidStart(TRANSACTION_START)
+                        .transactionValidStart(new Timestamp(Instant.now().getEpochSecond(), 0))
                         .accountID(getSenderAccountID(params))
                         .build())
                 .nodeAccountID(TREASURY_ACCOUNT_ID) // We don't really need another account here.
                 .transactionValidDuration(TRANSACTION_DURATION);
     }
 
-    private TransactionBody buildFileCreateTransactionBody(final CallServiceParameters params, long maxLifetime) {
-        return defaultTransactionBodyBuilder(params)
-                .fileCreate(FileCreateTransactionBody.newBuilder()
-                        .contents(com.hedera.pbj.runtime.io.buffer.Bytes.wrap(
-                                params.getCallData().toArrayUnsafe()))
-                        .expirationTime(new Timestamp(maxLifetime, 0))
-                        .build())
-                .build();
-    }
-
-    private TransactionBody buildContractCreateTransactionBodyWithInitBytecode(
+    private TransactionBody buildContractCreateTransactionBody(
             final CallServiceParameters params, long estimatedGas, long maxLifetime) {
         return defaultTransactionBodyBuilder(params)
                 .contractCreateInstance(ContractCreateTransactionBody.newBuilder()
@@ -191,17 +187,7 @@ public class TransactionExecutionService {
                         .gas(estimatedGas)
                         .autoRenewPeriod(new Duration(maxLifetime))
                         .build())
-                .build();
-    }
-
-    private TransactionBody buildContractCreateTransactionBodyWithFileID(
-            final CallServiceParameters params, final FileID fileID, long estimatedGas, long maxLifetime) {
-        return defaultTransactionBodyBuilder(params)
-                .contractCreateInstance(ContractCreateTransactionBody.newBuilder()
-                        .fileID(fileID)
-                        .gas(estimatedGas)
-                        .autoRenewPeriod(new Duration(maxLifetime))
-                        .build())
+                .transactionFee(CONTRACT_CREATE_TX_FEE)
                 .build();
     }
 
@@ -215,6 +201,7 @@ public class TransactionExecutionService {
                                 .build())
                         .functionParameters(com.hedera.pbj.runtime.io.buffer.Bytes.wrap(
                                 params.getCallData().toArrayUnsafe()))
+                        .amount(params.getValue()) // tinybars sent to contract
                         .gas(estimatedGas)
                         .build())
                 .build();
@@ -247,19 +234,6 @@ public class TransactionExecutionService {
     private OperationTracer[] getOperationTracers() {
         return ContractCallContext.get().getOpcodeTracerOptions() != null
                 ? new OperationTracer[] {opcodeTracer}
-                : EMPTY_OPERATION_TRACER_ARRAY;
-    }
-
-    public static class ExecutorFactory {
-
-        private ExecutorFactory() {}
-
-        public static TransactionExecutor newExecutor(
-                State mirrorNodeState,
-                Map<String, String> properties,
-                @Nullable final TracerBinding customTracerBinding) {
-            return TransactionExecutors.TRANSACTION_EXECUTORS.newExecutor(
-                    mirrorNodeState, properties, customTracerBinding);
-        }
+                : new OperationTracer[] {mirrorOperationTracer};
     }
 }

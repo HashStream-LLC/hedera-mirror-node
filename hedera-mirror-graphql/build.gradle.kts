@@ -47,7 +47,7 @@ dependencies {
     runtimeOnly(
         group = "io.netty",
         name = "netty-resolver-dns-native-macos",
-        classifier = "osx-aarch_64"
+        classifier = "osx-aarch_64",
     )
     runtimeOnly("org.postgresql:postgresql")
     testImplementation(project(path = ":common", configuration = "testClasses"))
@@ -56,6 +56,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.graphql:spring-graphql-test")
     testImplementation("org.testcontainers:postgresql")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 generatePojoConf {
@@ -73,7 +74,7 @@ generatePojoConf {
                 "java.time.Duration",
                 "",
                 "com.hedera.mirror.graphql.config.GraphQlDuration.INSTANCE",
-                ""
+                "",
             ),
             CustomScalarDefinition("Long", "java.lang.Long", "", "graphql.scalars.GraphQLLong", ""),
             CustomScalarDefinition("Object", "java.lang.Object", "", "graphql.scalars.Object", ""),
@@ -82,13 +83,13 @@ generatePojoConf {
                 "java.time.Instant",
                 "",
                 "com.hedera.mirror.graphql.config.GraphQlTimestamp.INSTANCE",
-                ""
+                "",
             ),
         )
     )
 }
 
-tasks.withType<JavaCompile> {
+tasks.withType<JavaCompile>().configureEach {
     dependsOn(tasks.generatePojo)
     if (name == "compileJava") {
         options.compilerArgs.addAll(

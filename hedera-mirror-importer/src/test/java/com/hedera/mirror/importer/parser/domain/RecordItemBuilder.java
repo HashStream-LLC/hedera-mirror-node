@@ -68,18 +68,23 @@ import com.hederahashgraph.api.proto.java.CryptoAllowance;
 import com.hederahashgraph.api.proto.java.CryptoApproveAllowanceTransactionBody;
 import com.hederahashgraph.api.proto.java.CryptoCreateTransactionBody;
 import com.hederahashgraph.api.proto.java.CryptoDeleteAllowanceTransactionBody;
+import com.hederahashgraph.api.proto.java.CryptoDeleteLiveHashTransactionBody;
 import com.hederahashgraph.api.proto.java.CryptoDeleteTransactionBody;
 import com.hederahashgraph.api.proto.java.CryptoTransferTransactionBody;
 import com.hederahashgraph.api.proto.java.CryptoUpdateTransactionBody;
 import com.hederahashgraph.api.proto.java.CustomFee;
 import com.hederahashgraph.api.proto.java.CustomFee.FeeCase;
+import com.hederahashgraph.api.proto.java.CustomFeeLimit;
 import com.hederahashgraph.api.proto.java.Duration;
 import com.hederahashgraph.api.proto.java.EthereumTransactionBody;
+import com.hederahashgraph.api.proto.java.FeeExemptKeyList;
 import com.hederahashgraph.api.proto.java.FileAppendTransactionBody;
 import com.hederahashgraph.api.proto.java.FileCreateTransactionBody;
 import com.hederahashgraph.api.proto.java.FileDeleteTransactionBody;
 import com.hederahashgraph.api.proto.java.FileID;
 import com.hederahashgraph.api.proto.java.FileUpdateTransactionBody;
+import com.hederahashgraph.api.proto.java.FixedCustomFee;
+import com.hederahashgraph.api.proto.java.FixedCustomFeeList;
 import com.hederahashgraph.api.proto.java.FixedFee;
 import com.hederahashgraph.api.proto.java.Fraction;
 import com.hederahashgraph.api.proto.java.FractionalFee;
@@ -232,9 +237,12 @@ public class RecordItemBuilder {
 
     public Builder<ConsensusCreateTopicTransactionBody.Builder> consensusCreateTopic() {
         var transactionBody = ConsensusCreateTopicTransactionBody.newBuilder()
+                .addAllFeeExemptKeyList(List.of(key(), key()))
+                .addAllCustomFees(fixedCustomFees())
                 .setAdminKey(key())
                 .setAutoRenewAccount(accountId())
                 .setAutoRenewPeriod(duration(3600))
+                .setFeeScheduleKey(key())
                 .setMemo(text(16))
                 .setSubmitKey(key());
         return new Builder<>(TransactionType.CONSENSUSCREATETOPIC, transactionBody)
@@ -257,6 +265,17 @@ public class RecordItemBuilder {
                         .setTopicSequenceNumber(state.get(topicId).getSequenceNumber()))
                 .receipt(r -> r.setTopicRunningHash(bytes(48)).setTopicRunningHashVersion(3));
 
+        var maxCustomFees = List.of(
+                CustomFeeLimit.newBuilder()
+                        .addFees(FixedFee.newBuilder().setAmount(id()))
+                        .setAccountId(accountId())
+                        .build(),
+                CustomFeeLimit.newBuilder()
+                        .addFees(FixedFee.newBuilder().setAmount(id()).setDenominatingTokenId(tokenId()))
+                        .setAccountId(accountId())
+                        .build());
+        builder.transactionBodyWrapper.addAllMaxCustomFees(maxCustomFees);
+
         transactionBody.setChunkInfo(ConsensusMessageChunkInfo.newBuilder()
                 .setInitialTransactionID(builder.transactionBodyWrapper.getTransactionID())
                 .setNumber(1)
@@ -270,6 +289,9 @@ public class RecordItemBuilder {
                 .setAdminKey(key())
                 .setAutoRenewAccount(accountId())
                 .setAutoRenewPeriod(duration(3600))
+                .setCustomFees(FixedCustomFeeList.newBuilder().addAllFees(fixedCustomFees()))
+                .setFeeExemptKeyList(FeeExemptKeyList.newBuilder().addAllKeys(List.of(key(), key())))
+                .setFeeScheduleKey(key())
                 .setExpirationTime(timestamp())
                 .setMemo(StringValue.of(text(16)))
                 .setSubmitKey(key())
@@ -415,6 +437,18 @@ public class RecordItemBuilder {
                         .setHash(bytes(48))
                         .setKeys(KeyList.newBuilder().addKeys(key())));
         return new Builder<>(TransactionType.CRYPTOADDLIVEHASH, builder);
+    }
+
+    public Builder<CryptoDeleteLiveHashTransactionBody.Builder> cryptoDeleteLiveHash() {
+        var builder = CryptoDeleteLiveHashTransactionBody.newBuilder()
+                .setLiveHashToDelete(LiveHash.newBuilder()
+                        .setAccountId(accountId())
+                        .setDuration(duration(900))
+                        .setHash(bytes(48))
+                        .setKeys(KeyList.newBuilder().addKeys(key()))
+                        .build()
+                        .toByteString());
+        return new Builder<>(TransactionType.CRYPTODELETELIVEHASH, builder);
     }
 
     public Builder<CryptoApproveAllowanceTransactionBody.Builder> cryptoApproveAllowance() {
@@ -571,7 +605,7 @@ public class RecordItemBuilder {
                 .setProxyAccountID(accountId())
                 .setReceiverSigRequired(false)
                 .setStakedNodeId(1L);
-        return new Builder<>(TransactionType.CRYPTOUPDATEACCOUNT, builder).receipt(r -> r.setAccountID(accountId));
+        return new Builder<>(TransactionType.CRYPTOUPDATEACCOUNT, builder);
     }
 
     public CustomFee.Builder customFee(CustomFee.FeeCase feeCase) {
@@ -588,6 +622,18 @@ public class RecordItemBuilder {
         }
 
         return customFee;
+    }
+
+    private List<FixedCustomFee> fixedCustomFees() {
+        return List.of(
+                FixedCustomFee.newBuilder()
+                        .setFeeCollectorAccountId(accountId())
+                        .setFixedFee(FixedFee.newBuilder().setAmount(id()))
+                        .build(),
+                FixedCustomFee.newBuilder()
+                        .setFeeCollectorAccountId(accountId())
+                        .setFixedFee(FixedFee.newBuilder().setAmount(id()).setDenominatingTokenId(tokenId()))
+                        .build());
     }
 
     private FixedFee.Builder fixedFee() {
@@ -660,7 +706,7 @@ public class RecordItemBuilder {
     public Builder<FileDeleteTransactionBody.Builder> fileDelete() {
         var fileId = fileId();
         var builder = FileDeleteTransactionBody.newBuilder().setFileID(fileId);
-        return new Builder<>(TransactionType.FILEDELETE, builder).receipt(b -> b.setFileID(fileId));
+        return new Builder<>(TransactionType.FILEDELETE, builder);
     }
 
     public Builder<FileUpdateTransactionBody.Builder> fileUpdate() {
@@ -1073,6 +1119,7 @@ public class RecordItemBuilder {
         return new Builder<>(TransactionType.TOKENWIPE, transactionBody).receipt(r -> r.setNewTotalSupply(2L));
     }
 
+    @SuppressWarnings("deprecation")
     public Builder<UncheckedSubmitBody.Builder> uncheckedSubmit() {
         var transactionBody = UncheckedSubmitBody.newBuilder().setTransactionBytes(bytes(32));
         return new Builder<>(TransactionType.UNCHECKEDSUBMIT, transactionBody);
@@ -1212,7 +1259,7 @@ public class RecordItemBuilder {
         return id.incrementAndGet();
     }
 
-    private Key key() {
+    public Key key() {
         if (id.get() % 2 == 0) {
             return Key.newBuilder().setECDSASecp256K1(bytes(KEY_LENGTH_ECDSA)).build();
         } else {
@@ -1264,7 +1311,7 @@ public class RecordItemBuilder {
     }
 
     public String text(int characters) {
-        return RandomStringUtils.randomAlphanumeric(characters);
+        return RandomStringUtils.secure().nextAlphanumeric(characters);
     }
 
     public Timestamp timestamp() {

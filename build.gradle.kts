@@ -30,13 +30,14 @@ plugins {
 
 // Can't use typed variable syntax due to Dependabot limitations
 extra.apply {
-    set("grpcVersion", "1.69.0")
+    set("grpcVersion", "1.70.0")
+    set("json-smart.version", "2.5.2") // Temporary until next Spring Boot
     set("mapStructVersion", "1.6.3")
+    set("netty.version", "4.1.118.Final") // Temporary until next Spring Boot
     set("nodeJsVersion", "18.20.5")
     set("protobufVersion", "3.25.5")
     set("reactorGrpcVersion", "1.2.4")
-    set("tomcat.version", "10.1.34") // Temporary until next Spring Boot version
-    set("vertxVersion", "4.5.11")
+    set("vertxVersion", "4.5.13")
     set("tuweniVersion", "2.3.1")
 }
 
@@ -55,7 +56,7 @@ dependencies {
         api("com.esaulpaugh:headlong:10.0.2")
         api("com.github.meanbeanlib:meanbean:3.0.0-M9")
         api("com.github.vertical-blank:sql-formatter:2.0.5")
-        api("org.bouncycastle:bcprov-jdk18on:1.79")
+        api("org.bouncycastle:bcprov-jdk18on:1.80")
         api("com.bucket4j:bucket4j-core:8.10.1")
         api("com.google.cloud:spring-cloud-gcp-dependencies:5.8.0")
         api("com.google.guava:guava:33.4.0-jre")
@@ -63,22 +64,21 @@ dependencies {
         api("com.graphql-java-generator:graphql-java-client-runtime:2.8")
         api("com.graphql-java:graphql-java-extended-scalars:22.0")
         api("com.graphql-java:graphql-java-extended-validation:22.0")
-        api("com.hedera.hashgraph:app:0.57.3")
+        api("com.hedera.hashgraph:app:0.59.0")
         api("com.hedera.evm:hedera-evm:0.54.2")
-        api("com.hedera.hashgraph:hedera-protobuf-java-api:0.57.3")
+        api("com.hedera.hashgraph:hedera-protobuf-java-api:0.59.1")
         api("com.hedera.hashgraph:sdk:2.46.0")
         api("com.ongres.scram:client:2.1")
-        api("com.playtika.testcontainers:embedded-google-pubsub:3.1.10")
-        api("com.redis.testcontainers:testcontainers-redis-junit-jupiter:1.4.6")
+        api("com.playtika.testcontainers:embedded-google-pubsub:3.1.11")
         api("com.salesforce.servicelibs:reactor-grpc-stub:$reactorGrpcVersion")
-        api("commons-beanutils:commons-beanutils:1.9.4")
+        api("commons-beanutils:commons-beanutils:1.10.1")
         api("commons-io:commons-io:2.18.0")
-        api("io.cucumber:cucumber-bom:7.20.1")
+        api("io.cucumber:cucumber-bom:7.21.1")
         api("io.github.mweirauch:micrometer-jvm-extras:0.2.2")
         api("io.grpc:grpc-bom:$grpcVersion")
-        api("io.hypersistence:hypersistence-utils-hibernate-63:3.9.0")
-        api("io.projectreactor:reactor-core-micrometer:1.2.1")
-        api("io.swagger:swagger-annotations:1.6.14")
+        api("io.hypersistence:hypersistence-utils-hibernate-63:3.9.2")
+        api("io.projectreactor:reactor-core-micrometer:1.2.3")
+        api("io.swagger:swagger-annotations:1.6.15")
         api("io.vertx:vertx-pg-client:$vertxVersion")
         api("io.vertx:vertx-codegen:$vertxVersion")
         api("io.vertx:vertx-core:$vertxVersion")
@@ -93,22 +93,23 @@ dependencies {
         api("org.apache.tuweni:tuweni-units:$tuweniVersion")
         api("org.apache.velocity:velocity-engine-core:2.4.1")
         api("org.eclipse.jetty.toolchain:jetty-jakarta-servlet-api:5.0.2")
-        api("org.gaul:s3proxy:2.5.0")
+        api("org.gaul:s3proxy:2.6.0")
         api("org.hyperledger.besu:secp256k1:0.8.2")
         api("org.hyperledger.besu:evm:24.3.3")
         api("org.mapstruct:mapstruct:$mapStructVersion")
         api("org.mapstruct:mapstruct-processor:$mapStructVersion")
-        api("org.msgpack:jackson-dataformat-msgpack:0.9.8")
+        api("org.msgpack:jackson-dataformat-msgpack:0.9.9")
         api("org.springdoc:springdoc-openapi-webflux-ui:1.8.0")
-        api("org.springframework.cloud:spring-cloud-dependencies:2023.0.4")
+        api("org.springframework.cloud:spring-cloud-dependencies:2024.0.0")
         api("org.testcontainers:junit-jupiter:1.20.4")
         api("org.mockito:mockito-inline:5.2.0")
-        api("software.amazon.awssdk:bom:2.29.45")
+        api("software.amazon.awssdk:bom:2.30.21")
         api("uk.org.webcompere:system-stubs-jupiter:2.1.7")
         api("org.web3j:core:4.12.2")
         api("tech.pegasys:jc-kzg-4844:1.0.0")
         api("org.apache.kafka:kafka-clients:3.2.0")
         api("org.springframework.kafka:spring-kafka:2.8.6")
+        api("com.hedera.cryptography:hedera-cryptography-bls:0.1.1-SNAPSHOT")
     }
 }
 
@@ -137,7 +138,7 @@ allprojects {
             property("sonar.issue.ignore.multicriteria.e6.ruleKey", "java:S2970")
             property(
                 "sonar.exclusions",
-                "src/main/java/com/hedera/services/**,src/test/java/com/hedera/services/**"
+                "src/main/java/com/hedera/services/**,src/test/java/com/hedera/services/**",
             )
         }
     }
@@ -207,18 +208,12 @@ spotless {
     }
     format("javascript") {
         endWithNewline()
-        indentWithSpaces(2)
+        leadingTabsToSpaces(2)
         licenseHeader(licenseHeader, "$").updateYearWithLatest(true)
         prettier()
             .npmExecutable(npmExecutable)
             .npmInstallCache(Paths.get("${rootProject.rootDir}", ".gradle", "spotless"))
-            .config(
-                mapOf(
-                    "bracketSpacing" to false,
-                    "printWidth" to 120,
-                    "singleQuote" to true,
-                )
-            )
+            .config(mapOf("bracketSpacing" to false, "printWidth" to 120, "singleQuote" to true))
         target("hedera-mirror-rest/**/*.js", "hedera-mirror-test/**/*.js")
         targetExclude("**/build/**", "**/node_modules/**", "**/__tests__/integration/*.test.js")
     }
@@ -232,7 +227,7 @@ spotless {
             "hedera-mirror-rest/**",
             "hedera-mirror-rosetta/**",
             // Known issue with Java 21: https://github.com/palantir/palantir-java-format/issues/933
-            "hedera-mirror-rest-java/**/EntityServiceImpl.java"
+            "hedera-mirror-rest-java/**/EntityServiceImpl.java",
         )
         toggleOffOn()
     }
@@ -252,7 +247,7 @@ spotless {
     }
     format("miscellaneous") {
         endWithNewline()
-        indentWithSpaces(2)
+        leadingTabsToSpaces(2)
         prettier().npmExecutable(npmExecutable)
         target("**/*.json", "**/*.md", "**/*.yml", "**/*.yaml")
         targetExclude("**/build/**", "**/charts/**", "**/node_modules/**", "**/package-lock.json")
@@ -260,7 +255,7 @@ spotless {
     }
     format("proto") {
         endWithNewline()
-        indentWithSpaces(4)
+        leadingTabsToSpaces(4)
         licenseHeader(licenseHeader, "(package|syntax)").updateYearWithLatest(true)
         target("hedera-mirror-protobuf/**/*.proto")
         targetExclude("build/**")
@@ -268,7 +263,7 @@ spotless {
     }
     sql {
         endWithNewline()
-        indentWithSpaces()
+        leadingTabsToSpaces()
         target("hedera-mirror-(common|importer|rest)/**/*.sql")
         targetExclude("**/build/**", "**/node_modules/**")
         trimTrailingWhitespace()
@@ -281,7 +276,7 @@ fun replaceVersion(files: String, match: String) {
             "fileset"(
                 "dir" to rootProject.projectDir,
                 "includes" to files,
-                "excludes" to "**/node_modules/"
+                "excludes" to "**/node_modules/",
             )
         }
     }
@@ -298,12 +293,12 @@ tasks.register("release") {
         replaceVersion("gradle.properties", "(?<=^version=).+")
         replaceVersion(
             "hedera-mirror-rest/**/package*.json",
-            "(?<=\"@hashgraph/(check-state-proof|mirror-rest|mirror-monitor)\",\\s{3,7}\"version\": \")[^\"]+"
+            "(?<=\"@hashgraph/(check-state-proof|mirror-rest|mirror-monitor)\",\\s{3,7}\"version\": \")[^\"]+",
         )
         replaceVersion("hedera-mirror-rest/**/openapi.yml", "(?<=^  version: ).+")
         replaceVersion(
             "tools/traffic-replay/log-downloader/package*.json",
-            "(?<=\"@hashgraph/mirror-log-downloader\",\\s{3,7}\"version\": \")[^\"]+"
+            "(?<=\"@hashgraph/mirror-log-downloader\",\\s{3,7}\"version\": \")[^\"]+",
         )
     }
 }

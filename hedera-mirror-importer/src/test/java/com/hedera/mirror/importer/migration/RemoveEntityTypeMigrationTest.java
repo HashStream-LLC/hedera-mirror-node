@@ -32,8 +32,6 @@ import com.hedera.mirror.common.domain.entity.EntityType;
 import com.hedera.mirror.importer.DisableRepeatableSqlMigration;
 import com.hedera.mirror.importer.EnabledIfV1;
 import com.hedera.mirror.importer.ImporterIntegrationTest;
-import com.hedera.mirror.importer.config.Owner;
-import jakarta.annotation.Resource;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,24 +43,18 @@ import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
-import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
+@DisablePartitionMaintenance
 @DisableRepeatableSqlMigration
 @EnabledIfV1
-@Import(DisablePartitionMaintenanceConfiguration.class)
 @Tag("migration")
 @TestPropertySource(properties = "spring.flyway.target=1.46.11")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class RemoveEntityTypeMigrationTest extends ImporterIntegrationTest {
-
-    @Resource
-    @Owner
-    private JdbcOperations jdbcOperations;
 
     @Value("classpath:db/migration/v1/V1.47.1__remove_t_entity_types.sql")
     private File migrationSql;
@@ -136,7 +128,7 @@ class RemoveEntityTypeMigrationTest extends ImporterIntegrationTest {
 
     @SneakyThrows
     private void migrate() {
-        jdbcOperations.execute(FileUtils.readFileToString(migrationSql, "UTF-8"));
+        ownerJdbcTemplate.execute(FileUtils.readFileToString(migrationSql, "UTF-8"));
     }
 
     private MigrationEntityV1_47_1 entity(long id, long num, EntityType type) {

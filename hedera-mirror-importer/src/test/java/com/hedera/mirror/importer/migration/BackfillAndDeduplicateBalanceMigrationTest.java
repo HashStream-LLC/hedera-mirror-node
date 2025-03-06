@@ -25,8 +25,6 @@ import com.hedera.mirror.common.domain.balance.AccountBalance;
 import com.hedera.mirror.common.domain.balance.TokenBalance;
 import com.hedera.mirror.common.domain.entity.EntityId;
 import com.hedera.mirror.importer.EnabledIfV1;
-import com.hedera.mirror.importer.ImporterProperties;
-import com.hedera.mirror.importer.config.Owner;
 import com.hedera.mirror.importer.repository.AccountBalanceRepository;
 import com.hedera.mirror.importer.repository.TokenBalanceRepository;
 import java.nio.charset.StandardCharsets;
@@ -41,11 +39,11 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.util.StreamUtils;
 
 @EnabledIfV1
@@ -73,22 +71,26 @@ class BackfillAndDeduplicateBalanceMigrationTest
             """;
 
     private final AccountBalanceRepository accountBalanceRepository;
-    private final @Owner JdbcTemplate jdbcTemplate;
     private final @Getter BackfillAndDeduplicateBalanceMigration migration;
     private final @Getter Class<BackfillAndDeduplicateBalanceMigration> migrationClass =
             BackfillAndDeduplicateBalanceMigration.class;
-    private final ImporterProperties importerProperties;
 
     @Value("classpath:db/migration/v1/V1.89.1__add_balance_deduplicate_functions.sql")
     private final Resource migrationSql;
 
     private final TokenBalanceRepository tokenBalanceRepository;
 
+    @BeforeEach
+    void setup() {
+        migration.migrationProperties.setEnabled(true);
+    }
+
     @AfterEach
     void teardown() {
         addBalanceDeduplicateFunctions();
-        jdbcTemplate.execute(REVERT_DDL);
-        getMigrationProperties().getParams().clear();
+        ownerJdbcTemplate.execute(REVERT_DDL);
+        migration.migrationProperties.setEnabled(false);
+        migration.migrationProperties.getParams().clear();
     }
 
     @Test
@@ -456,7 +458,7 @@ class BackfillAndDeduplicateBalanceMigrationTest
     @Test
     void minFrequency() {
         // given min frequency is set to 6 minutes
-        getMigrationProperties().getParams().put("minFrequency", "6m");
+        migration.migrationProperties.getParams().put("minFrequency", "6m");
 
         var treasury = EntityId.of(TREASURY);
         var account = EntityId.of(domainBuilder.id() + TREASURY);
@@ -567,7 +569,7 @@ class BackfillAndDeduplicateBalanceMigrationTest
     @SneakyThrows
     private void addBalanceDeduplicateFunctions() {
         try (var is = migrationSql.getInputStream()) {
-            jdbcTemplate.execute(StreamUtils.copyToString(is, StandardCharsets.UTF_8));
+            ownerJdbcTemplate.execute(StreamUtils.copyToString(is, StandardCharsets.UTF_8));
         }
     }
 
@@ -577,7 +579,7 @@ class BackfillAndDeduplicateBalanceMigrationTest
     }
 
     private void persistOldAccountBalances(Collection<AccountBalance> accountBalances) {
-        jdbcTemplate.batchUpdate(
+        jdbcOperations.batchUpdate(
                 """
                         insert into account_balance_old (account_id, balance, consensus_timestamp)
                         values (?, ?, ?)
@@ -592,7 +594,7 @@ class BackfillAndDeduplicateBalanceMigrationTest
     }
 
     private void persistOldTokenBalances(Collection<TokenBalance> tokenBalances) {
-        jdbcTemplate.batchUpdate(
+        jdbcOperations.batchUpdate(
                 """
                         insert into token_balance_old (account_id, balance, consensus_timestamp, token_id)
                         values (?, ?, ?, ?)
@@ -607,17 +609,13 @@ class BackfillAndDeduplicateBalanceMigrationTest
                 });
     }
 
-    private MigrationProperties getMigrationProperties() {
-        return importerProperties.getMigration().get("backfillAndDeduplicateBalanceMigration");
-    }
-
     @SneakyThrows
     private void runMigration() {
         migration.doMigrate();
     }
 
     private void setSentinelTimestamp(long timestamp) {
-        jdbcTemplate.update(
+        jdbcOperations.update(
                 "insert into account_balance_old (account_id, balance, consensus_timestamp) values (?, ?, ?)",
                 -1L,
                 timestamp,

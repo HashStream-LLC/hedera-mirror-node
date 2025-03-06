@@ -23,6 +23,7 @@ import static org.apache.commons.io.FilenameUtils.removeExtension;
 
 import com.google.common.base.Splitter;
 import com.hedera.mirror.common.domain.StreamType;
+import com.hedera.mirror.common.domain.transaction.BlockFile;
 import com.hedera.mirror.importer.downloader.provider.S3StreamFileProvider;
 import com.hedera.mirror.importer.exception.InvalidStreamFileException;
 import java.time.Instant;
@@ -108,7 +109,9 @@ public class StreamFilename implements Comparable<StreamFilename> {
 
         // A compressed and uncompressed file can exist simultaneously, so we need uniqueness to not include .gz
         this.filenameWithoutCompressor = isCompressed() ? removeExtension(this.filename) : this.filename;
-        this.instant = extractInstant(filename, this.fullExtension, this.sidecarId, this.streamType.getSuffix());
+        this.instant = streamType != StreamType.BLOCK
+                ? extractInstant(filename, this.fullExtension, this.sidecarId, this.streamType.getSuffix())
+                : null;
 
         var builder = new StringBuilder();
         if (!StringUtils.isEmpty(this.path)) {
@@ -121,6 +124,10 @@ public class StreamFilename implements Comparable<StreamFilename> {
         }
         builder.append(this.filename);
         this.filePath = builder.toString();
+    }
+
+    public static StreamFilename from(long blockNumber) {
+        return from(BlockFile.getBlockStreamFilename(blockNumber));
     }
 
     public static StreamFilename from(String filePath) {
@@ -154,6 +161,14 @@ public class StreamFilename implements Comparable<StreamFilename> {
         }
 
         return StringUtils.joinWith(".", StringUtils.join(timestamp, suffix), extension);
+    }
+
+    public Instant getInstant() {
+        if (streamType == StreamType.BLOCK) {
+            throw new IllegalStateException("BLOCK stream file doesn't have instant in its filename");
+        }
+
+        return instant;
     }
 
     @SuppressWarnings("java:S3776")

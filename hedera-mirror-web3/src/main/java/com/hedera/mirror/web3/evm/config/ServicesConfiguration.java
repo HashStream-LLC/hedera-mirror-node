@@ -770,7 +770,7 @@ public class ServicesConfiguration {
     HederaExtCodeHashOperationV038 hederaExtCodeHashOperationV038(
             final GasCalculator gasCalculator,
             final Predicate<Address> strictSystemAccountDetector,
-            BiPredicate<Address, MessageFrame> addressValidator,
+            final BiPredicate<Address, MessageFrame> addressValidator,
             final MirrorNodeEvmProperties mirrorNodeEvmProperties) {
         return new HederaExtCodeHashOperationV038(
                 gasCalculator, addressValidator, strictSystemAccountDetector, mirrorNodeEvmProperties);
@@ -778,8 +778,8 @@ public class ServicesConfiguration {
 
     @Bean
     HederaExtCodeHashOperation hederaExtCodeHashOperation(
-            final GasCalculator gasCalculator, BiPredicate<Address, MessageFrame> preV38AddressValidator) {
-        return new HederaExtCodeHashOperation(gasCalculator, preV38AddressValidator);
+            final GasCalculator gasCalculator, final BiPredicate<Address, MessageFrame> addressValidator) {
+        return new HederaExtCodeHashOperation(gasCalculator, addressValidator);
     }
 
     @Bean
@@ -789,11 +789,6 @@ public class ServicesConfiguration {
                 .collect(Collectors.toSet());
         return (address, frame) ->
                 precompiles.contains(address) || frame.getWorldUpdater().get(address) != null;
-    }
-
-    @Bean
-    BiPredicate<Address, MessageFrame> preV38AddressValidator() {
-        return (address, frame) -> frame.getWorldUpdater().get(address) != null;
     }
 
     @Bean

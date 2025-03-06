@@ -54,12 +54,11 @@ dependencies {
     runtimeOnly(
         group = "io.netty",
         name = "netty-resolver-dns-native-macos",
-        classifier = "osx-aarch_64"
+        classifier = "osx-aarch_64",
     )
     testImplementation(project(path = ":common", configuration = "testClasses"))
     testImplementation("com.github.vertical-blank:sql-formatter")
     testImplementation("com.playtika.testcontainers:embedded-google-pubsub")
-    testImplementation("com.redis.testcontainers:testcontainers-redis-junit-jupiter")
     testImplementation("commons-beanutils:commons-beanutils")
     testImplementation("io.projectreactor:reactor-test")
     testImplementation("org.apache.commons:commons-math3")
@@ -68,6 +67,7 @@ dependencies {
     testImplementation("org.gaul:s3proxy")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:postgresql")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation(project(":protobuf"))
     implementation("org.apache.kafka:kafka-clients")
     implementation("org.springframework.kafka:spring-kafka")

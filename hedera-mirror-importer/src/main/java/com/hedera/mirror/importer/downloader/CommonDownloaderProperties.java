@@ -19,6 +19,7 @@ package com.hedera.mirror.importer.downloader;
 import com.hedera.mirror.importer.ImporterProperties;
 import com.hedera.mirror.importer.ImporterProperties.HederaNetwork;
 import jakarta.annotation.PostConstruct;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -81,11 +82,14 @@ public class CommonDownloaderProperties {
     @NotNull
     private PathType pathType = PathType.ACCOUNT_ID;
 
+    private String pathPrefix = "";
+
     private String region = "us-east-1";
 
     private String secretKey;
 
     @NotNull
+    @Valid
     private List<StreamSourceProperties> sources = new ArrayList<>();
 
     @DurationMin(seconds = 1)
